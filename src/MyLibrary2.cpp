@@ -8,6 +8,15 @@
 #include <qwidget.h>
 #include <qlineedit.h>
 #include <qstring.h>
+#include <qfilesystemmodel.h>
+#include <qlist.h>
+#include <qlistview.h>
+#include <QStandardItemModel>
+#include <QStandardItem>
+#include <QStringListModel>
+#include <QAbstractItemModel>
+#include <qsortfilterproxymodel.h>
+#include <qtreeview.h>
 
 typedef int (WINAPI* MESSAGEBOXA)(HWND, LPCSTR, LPCSTR, UINT);
 
@@ -125,7 +134,7 @@ DWORD WINAPI DetourGetFullPathNameW(LPCWSTR lpFileName, DWORD nBufferLength, LPW
 	return res;
 }
 
-
+#if 0
 void FindWidget() {
 	while (true)
 	{
@@ -139,9 +148,13 @@ void FindWidget() {
 			continue;
 		}
 
-		
+		std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
 		for (QObject* child : window->findChildren<QObject*>()) {
-			std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
+
+			std::cout << "child_name:" << child->objectName().toStdString() << std::endl;
+
+			continue;
+
 			if (QLineEdit* lineEdit = qobject_cast<QLineEdit*>(child)) {
 				// 找到文本框，您可以在这里进行处理
 				//qDebug() << "Found QLineEdit:" << lineEdit->objectName() << lineEdit->text();
@@ -161,6 +174,370 @@ void FindWidget() {
 		
 	}
 }
+#endif
+
+#if 0
+void FindWidget() {
+	while (true)
+	{
+		Sleep(3000);
+
+
+		auto window = QApplication::activeWindow();
+
+		if (NULL == window) {
+			std::cout << "window is null" << std::endl;
+			continue;
+		}
+
+		std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
+
+		if ("QFileDialog" != window->objectName().toStdString()) {
+			continue;
+		}
+
+
+		for (QObject* child : window->findChildren<QObject*>()) {
+
+			//std::cout << "child_name:" << child->objectName().toStdString() /*<< std::endl*/;
+#if 0
+			if ("qt_filesystem_model" == child->objectName().toStdString()) {
+
+				if (QFileSystemModel* file_system_model = qobject_cast<QFileSystemModel*>(child)) {
+
+					std::cout << "file_system_model root_path:"<< file_system_model->rootPath().toStdString() << std::endl;
+
+					QMetaObject::invokeMethod(window, [=]() {
+						file_system_model->setRootPath("G:/"); // 这样只会修改文本框里面的值
+					});
+				}
+			}
+#endif
+
+			if ("listView" == child->objectName().toStdString()) {
+
+				std::cout << "find obj listView 0" << std::endl;
+
+
+				if (QListView* list_view = qobject_cast<QListView*>(child)) {
+
+					std::cout << "find obj listView 1" << std::endl;
+#if 0
+					{
+						QStandardItemModel* model = qobject_cast<QStandardItemModel*>(list_view->model());
+						if (!model) {
+							std::cout << "The model is not a QStandardItemModel.-----------------------------------------------------------" << std::endl;
+							
+						}
+					}
+
+					{
+						QFileSystemModel* model = qobject_cast<QFileSystemModel*>(list_view->model());
+						if (!model) {
+							std::cout << "The model is not a QFileSystemModel.-----------------------------------------------------------" << std::endl;
+
+						}
+					}
+
+					{
+						QStringListModel* model = qobject_cast<QStringListModel*>(list_view->model());
+						if (!model) {
+							std::cout << "The model is not a QStringListModel.-----------------------------------------------------------" << std::endl;
+
+						}
+					}
+
+					{
+						QAbstractTableModel* model = qobject_cast<QAbstractTableModel*>(list_view->model());
+						if (!model) {
+							std::cout << "The model is not a QAbstractTableModel.-----------------------------------------------------------" << std::endl;
+
+						}
+					}
+
+					{
+						QAbstractListModel* model = qobject_cast<QAbstractListModel*>(list_view->model());
+						if (!model) {
+							std::cout << "The model is not a QAbstractListModel.-----------------------------------------------------------" << std::endl;
+
+						}
+					}
+
+					{
+					
+						QAbstractItemModel* model = list_view->model();
+						if (model) {
+							const QMetaObject* metaObject = model->metaObject();
+							std::cout << "Model class name:" << metaObject->className() << std::endl; // QmayaFileDialogProxyModel
+
+							// 输出继承的父类信息
+							const QMetaObject* parentMetaObject = metaObject->superClass();
+							if (parentMetaObject) {
+								std::cout << "Parent class name:" << parentMetaObject->className(); // QSortFilterProxyModel
+							}
+						}
+					
+					}
+					{
+					
+						QAbstractItemModel* model = list_view->model();
+						if (model) {
+							std::cout << "Model type:" << model->metaObject()->className() << std::endl;
+						}
+					
+					}
+#endif
+					
+					
+					QSortFilterProxyModel* model = qobject_cast<QSortFilterProxyModel*>(list_view->model());
+
+					int c_row = -1;
+					for (int row = 0; row < model->rowCount(); ++row) {
+						QModelIndex index = model->index(row, 0); // 获取指定行的索引
+						QVariant value = model->data(index, Qt::DisplayRole); // 获取数据
+
+						if (value.isValid()) {
+							std::cout << value.toString().toStdString() << std::endl; // 打印项的文本
+						}
+
+						if (value.toString().contains("C:")) { // to do 忽略大小写
+
+							
+							c_row = row;
+
+							std::cout << "contains c c_row:" << c_row << std::endl;
+
+							QMetaObject::invokeMethod(window, [=]() {
+								list_view->setStyleSheet("background-color:#ff0000;");
+								list_view->hide();
+								list_view->setRowHidden(c_row, true);
+							});
+						}
+					}
+
+					
+
+#if 0
+					QModelIndex proxyIndex = model->index(c_row, 0); // 获取代理模型的索引
+					if (proxyIndex.isValid()) {
+						// 将代理索引映射到源模型索引
+						QModelIndex sourceIndex = model->mapToSource(proxyIndex);
+
+						std::cout << "sourceIndex: " << sourceIndex.row()  << "|" << sourceIndex.column() << std::endl;
+
+						QMetaObject::invokeMethod(window, [=]() {
+							// 获取源模型
+							QAbstractItemModel* sourceModel = model->sourceModel();
+
+							std::cout << "sourceModel:" << sourceModel << std::endl;
+
+							sourceModel->setData(sourceIndex, "");
+
+							if (sourceModel && sourceModel->removeRows(sourceIndex.row(), 1)) {
+								// 删除成功
+								std::cout << "remove ok" << std::endl;
+							}
+							else {
+
+								std::cout << "remove error" << std::endl;
+							}
+						});
+					}
+#endif
+
+#if 0
+
+					int c_row = -1;
+
+					// 遍历模型中的所有项并打印其值
+					for (int row = 0; row < model->rowCount(); ++row) {
+						QModelIndex index = model->index(row, 0); // 获取指定行的索引
+						QVariant value = model->data(index, Qt::DisplayRole); // 获取数据
+
+						if (value.isValid()) {
+							std::cout << value.toString().toStdString() << std::endl; // 打印项的文本
+						}
+
+						if (value.toString().contains("C:")) { // to do 忽略大小写
+						
+							c_row = row;
+						
+						}
+						{
+						
+							QModelIndex index = model->index(row, 1); // 获取指定行的索引
+							QVariant value = model->data(index, Qt::DisplayRole); // 获取数据
+
+							if (value.isValid()) {
+								std::cout << "row, 1" <<  value.toString().toStdString() << std::endl; // 打印项的文本
+							}
+
+							if (value.toString().contains("C:")) { // to do 忽略大小写
+
+								c_row = row;
+
+							}
+						
+						
+						}
+					}
+
+
+
+					QMetaObject::invokeMethod(window, [=]() {
+						if (c_row < 0) {
+							return;
+						}
+						//model->select();
+						bool res = model->removeRow(c_row);;
+
+						std::cout << "c_row:" << c_row << ",model removeRow  res:" << res << std::endl;
+					});
+#endif
+				}
+			
+			}
+
+
+
+#if 0
+			continue;
+
+			if (QLineEdit* lineEdit = qobject_cast<QLineEdit*>(child)) {
+				// 找到文本框，您可以在这里进行处理
+				//qDebug() << "Found QLineEdit:" << lineEdit->objectName() << lineEdit->text();
+				// 可以选择隐藏文本框
+				// lineEdit->hide();
+				std::cout << "objectName:" << lineEdit->objectName().toStdString() << ", text:" << lineEdit->text().toStdString() << std::endl;
+
+
+
+
+				//QMetaObject::invokeMethod(window, [=]() {
+				//	lineEdit->hide();
+				//});
+			}
+#endif
+		}
+	}
+}
+#endif
+
+void traverseModel(QFileSystemModel* model, const QModelIndex& index) {
+	// 获取当前项的文件路径
+	QString path = model->filePath(index);
+	std::cout << "Current Path:" << path.toStdString() << std::endl;
+
+	// 遍历当前项的子项
+	int rowCount = model->rowCount(index);
+	for (int row = 0; row < rowCount; ++row) {
+		QModelIndex childIndex = model->index(row, 0, index); // 获取子项索引
+		traverseModel(model, childIndex); // 递归遍历子项
+	}
+}
+
+#if 1
+void FindWidget() {
+	while (true)
+	{
+		Sleep(3000);
+
+
+		auto window = QApplication::activeWindow();
+
+		if (NULL == window) {
+			std::cout << "window is null" << std::endl;
+			continue;
+		}
+
+		std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
+
+		if ("QFileDialog" != window->objectName().toStdString()) {
+			continue;
+		}
+
+
+		for (QObject* child : window->findChildren<QObject*>()) {
+
+			//std::cout << "child_name:" << child->objectName().toStdString() /*<< std::endl*/;
+#if 0
+			if ("qt_filesystem_model" == child->objectName().toStdString()) {
+
+				if (QFileSystemModel* file_system_model = qobject_cast<QFileSystemModel*>(child)) {
+
+					std::cout << "file_system_model root_path:" << file_system_model->rootPath().toStdString() << std::endl;
+
+
+
+
+					QMetaObject::invokeMethod(window, [=]() {
+						//file_system_model->setRootPath("G:/"); // 这样只会修改文本框里面的值
+
+						
+					});
+				}
+			}
+#endif
+			if ("treeView" == child->objectName().toStdString()) {
+
+				std::cout << "find obj treeView 0" << std::endl;
+
+				if (QTreeView* tree_view = qobject_cast<QTreeView*>(child)) {
+		
+					std::cout << "find obj treeView 1" << std::endl;
+
+					QMetaObject::invokeMethod(window, [=]() {
+						
+						tree_view->setStyleSheet("background-color:#ff0000;");
+
+					});
+				}
+			}
+
+			if ("listView" == child->objectName().toStdString()) {
+
+				std::cout << "find obj listView 0" << std::endl;
+
+
+				if (QListView* list_view = qobject_cast<QListView*>(child)) {
+
+					std::cout << "find obj listView 1" << std::endl;
+
+					
+
+
+					auto* model = qobject_cast<QSortFilterProxyModel*>(list_view->model());
+
+					int c_row = -1;
+					for (int row = 0; row < model->rowCount(); ++row) {
+						QModelIndex index = model->index(row, 0); // 获取指定行的索引
+						QVariant value = model->data(index, Qt::DisplayRole); // 获取数据
+
+						if (value.isValid()) {
+							std::cout << value.toString().toStdString() << std::endl; // 打印项的文本
+						}
+
+						if (value.toString().contains("C:")) { // to do 忽略大小写
+
+
+							c_row = row;
+
+							std::cout << "contains c c_row:" << c_row << std::endl;
+
+							QMetaObject::invokeMethod(window, [=]() {
+							
+								list_view->setStyleSheet("background-color:#0000ff;");
+								list_view->setRowHidden(c_row, true);
+							});
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+#endif
 
 std::thread find_widget_thread;
 

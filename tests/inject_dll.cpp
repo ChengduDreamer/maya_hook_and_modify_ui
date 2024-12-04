@@ -81,11 +81,20 @@ BOOL CreateRemoteThreadInjectDll(DWORD Pid, char* DllName)
 
 int main(int argc, char* argv[])
 {
+#if 0
     DWORD pid = FindProcessID("target_test.exe");
     std::cout << "进程PID: " << pid << std::endl;
 
     bool flag = CreateRemoteThreadInjectDll(pid, (char*)"C:\\code\\hub\\test_minhook\\out\\build\\x64-RelWithDebInfo\\MyLibrary.dll");
     std::cout << "注入状态: " << flag << std::endl;
+#endif
+
+    DWORD pid = FindProcessID("maya.exe");
+    std::cout << "进程PID: " << pid << std::endl;
+
+    bool flag = CreateRemoteThreadInjectDll(pid, (char*)"C:\\code\\hub\\test_minhook\\out\\build\\x64-RelWithDebInfo\\MyLibrary2.dll");
+    std::cout << "注入状态: " << flag << std::endl;
+
 
     return 0;
 }

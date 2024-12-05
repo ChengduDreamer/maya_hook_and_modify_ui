@@ -112,10 +112,11 @@ void FindWidget() {
 		if ("QFileDialog" != window->objectName().toStdString()) {
 			continue;
 		}
-
+		#
 		for (QObject* child : window->findChildren<QObject*>()) {
 			//std::cout << "child_name:" << child->objectName().toStdString() /*<< std::endl*/;
 
+#if 0
 			if ("treeView" == child->objectName().toStdString()) {
 				std::cout << "find obj treeView 0" << std::endl;
 				if (g_tree_view = qobject_cast<QTreeView*>(child)) {
@@ -139,7 +140,6 @@ void FindWidget() {
 				}
 			}
 
-			
 			if ("listView" == child->objectName().toStdString()) {
 				std::cout << "find obj listView 0" << std::endl;
 				if (g_list_view = qobject_cast<QListView*>(child)) {
@@ -162,114 +162,44 @@ void FindWidget() {
 					}
 				}
 			}
-
-			
+#endif
 			//路径
 			if ("lookInCombo" == child->objectName().toStdString()) {
 				if (g_combo_box = qobject_cast<QComboBox*>(child)) {
 					g_current_path = g_combo_box->currentText();
 					std::string combo_box_text = g_combo_box->currentText().toStdString();
 					std::cout << "-------------------------------------------------------lookInCombo:" << combo_box_text << std::endl;
-
-
-					const QMetaObject* metaObject = child->metaObject();
-					std::cout << "child class name:" << metaObject->className() << std::endl; // QmayaFileDialogProxyModel
-
 					QMetaObject::invokeMethod(window, [=]() {
-						//g_combo_box->setEnabled(false);
-
-						
-
 						if (!g_current_path.startsWith(g_root_2_path)) {
 
 							std::cout << "-----------not startsWith:" << g_root_2_path.toStdString() << std::endl;
-							//combo_box->setEditable(true);
+							g_combo_box->setEnabled(true); // 如果为false,无法响应QKeyEvent
 							g_combo_box->setCurrentText(g_root_2_path);
-							//file_system_model->setRootPath();
-							
-							//emit combo_box->activated(g_root_path);
-							//QObject::connect(combo_box, &QComboBox::activated, [](int index) {
-							//	QMessageBox::information(nullptr, "Selected", QString("You selected index: %1").arg(index));
-							//});
-
-							//emit g_combo_box->currentTextChanged(g_root_2_path); // 没反应
-							//emit g_combo_box->activated(g_root_2_path);
-							//emit g_combo_box->activated(0);
-							//emit g_combo_box->currentIndexChanged(0);
-							//emit g_combo_box->textActivated(g_root_2_path);
-							//emit g_combo_box->textHighlighted(g_root_2_path);
-							//emit g_combo_box->highlighted(0);
-
-
-							QKeyEvent* event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
-							QCoreApplication::sendEvent(g_combo_box, event);
-							delete event;
+							QKeyEvent key_event{ QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier };
+							bool res = QCoreApplication::sendEvent(g_combo_box, &key_event);
+							if (!res) {
+								std::cout << "sendEvent key_event error" << std::endl;
+							}
 						}
 						else {
 							std::cout << "startsWith" << std::endl;
 						}
+						g_combo_box->setEnabled(false);
 					});
 				}
 			}
-
 
 			QFileSystemModel* file_system_model = nullptr;
 			if ("qt_filesystem_model" == child->objectName().toStdString()) {
 				if (file_system_model = qobject_cast<QFileSystemModel*>(child)) {
 					std::cout << "file_system_model root_path:" << file_system_model->rootPath().toStdString() << std::endl;
 					QMetaObject::invokeMethod(window, [=]() {
-						// startrootpath
-
-						std::cout << "combo_box = " << (void*)g_combo_box << std::endl;
-
-						//file_system_model->setRootPath(g_root_1_path);
-
-						//emit file_system_model->rootPathChanged(g_root_1_path);
-
-						//emit file_system_model->directoryLoaded(g_root_1_path);
-
-						if (g_combo_box) {
-							std::cout << "--emit combo_box" << std::endl;
-
-							//g_combo_box->setCurrentText("XXXXXXXXXXX");
-
-							//emit g_combo_box->currentTextChanged(g_root_2_path); // 没反应
-							//emit g_combo_box->activated(g_root_2_path);
-							//emit g_combo_box->activated(0);
-							//emit g_combo_box->currentIndexChanged(0);
-							//emit g_combo_box->textActivated(g_root_2_path);
-							//emit g_combo_box->textHighlighted(g_root_2_path);
-							//emit g_combo_box->highlighted(0);
-
-							  // 创建回车键事件
-							//QKeyEvent* event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
-							// 发送事件
-							//QCoreApplication::sendEvent(g_combo_box, event);
-							// 释放事件对象
-							//delete event;
-
-						}
-
-						//if (!file_system_model->rootPath().startsWith(g_root_1_path)) {
-						//	std::cout << "file_system_model not startsWith:" << g_root_1_path.toStdString() << std::endl;
-						//	file_system_model->setRootPath(g_root_1_path); // 这样只会修改文本框里面的值
-						//	if (g_combo_box) {
-						//		std::cout << "emit combo_box" << std::endl;
-						//		emit g_combo_box->currentTextChanged(g_root_2_path); // 没反应
-						//		emit g_combo_box->activated(g_root_1_path);
-						//		emit g_combo_box->activated(0);
-						//		emit g_combo_box->currentIndexChanged(0);
-						//		emit g_combo_box->textActivated(g_root_1_path);
-						//	}
-						//	
-						//}
+						//file_system_model->setRootPath(g_root_1_path); // 这样只会修改文本框里面的值
+						// to do 
 					});
 				}
 			}
 			 
-			 
-			
-			
 #if 0
 			if ("toParentButton" == child->objectName().toStdString()) {
 
@@ -312,7 +242,6 @@ void FindWidget() {
 
 			if ("ProjectFoldersSplitter" == child->objectName().toStdString()) {
 				if (QWidget* projwidget = qobject_cast<QWidget*>(child)) {
-					//std::cout << "label:" << label->text().toStdString() << std::endl;
 					QMetaObject::invokeMethod(window, [=]() {
 						projwidget->setStyleSheet("background-color:#0000ff;"); // 左上角文件夹那块
 						projwidget->hide();

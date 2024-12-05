@@ -182,15 +182,28 @@ void FindWidget() {
 
 						if (!g_current_path.startsWith(g_root_2_path)) {
 
-							//std::cout << "not startsWith:" << g_root_path.toStdString() << std::endl;
+							std::cout << "-----------not startsWith:" << g_root_2_path.toStdString() << std::endl;
 							//combo_box->setEditable(true);
-							//combo_box->setCurrentText(g_root_path);           
+							g_combo_box->setCurrentText(g_root_2_path);
 							//file_system_model->setRootPath();
-							//emit combo_box->currentTextChanged(g_root_path); // 没反应
+							
 							//emit combo_box->activated(g_root_path);
 							//QObject::connect(combo_box, &QComboBox::activated, [](int index) {
 							//	QMessageBox::information(nullptr, "Selected", QString("You selected index: %1").arg(index));
 							//});
+
+							//emit g_combo_box->currentTextChanged(g_root_2_path); // 没反应
+							//emit g_combo_box->activated(g_root_2_path);
+							//emit g_combo_box->activated(0);
+							//emit g_combo_box->currentIndexChanged(0);
+							//emit g_combo_box->textActivated(g_root_2_path);
+							//emit g_combo_box->textHighlighted(g_root_2_path);
+							//emit g_combo_box->highlighted(0);
+
+
+							QKeyEvent* event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+							QCoreApplication::sendEvent(g_combo_box, event);
+							delete event;
 						}
 						else {
 							std::cout << "startsWith" << std::endl;
@@ -218,7 +231,7 @@ void FindWidget() {
 						if (g_combo_box) {
 							std::cout << "--emit combo_box" << std::endl;
 
-							g_combo_box->setCurrentText("XXXXXXXXXXX");
+							//g_combo_box->setCurrentText("XXXXXXXXXXX");
 
 							//emit g_combo_box->currentTextChanged(g_root_2_path); // 没反应
 							//emit g_combo_box->activated(g_root_2_path);
@@ -229,11 +242,11 @@ void FindWidget() {
 							//emit g_combo_box->highlighted(0);
 
 							  // 创建回车键事件
-							QKeyEvent* event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+							//QKeyEvent* event = new QKeyEvent(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
 							// 发送事件
-							QCoreApplication::sendEvent(g_combo_box, event);
+							//QCoreApplication::sendEvent(g_combo_box, event);
 							// 释放事件对象
-							delete event;
+							//delete event;
 
 						}
 

@@ -16,6 +16,12 @@ find_package(Qt5 COMPONENTS Widgets REQUIRED)
 find_package(Qt5 COMPONENTS WebSockets REQUIRED)
 find_package(Qt5 COMPONENTS Sql REQUIRED)
 find_package(Qt5 COMPONENTS Core REQUIRED)
+find_package(Qt5 COMPONENTS WebView REQUIRED)
+find_package(Qt5 COMPONENTS WebEngine REQUIRED)
+find_package(Qt5 COMPONENTS WebEngineWidgets REQUIRED)
+find_package(Qt5 COMPONENTS Quick REQUIRED)
+find_package(Qt5 COMPONENTS QuickWidgets REQUIRED)
+#QtWebEngineWidgets
 
 include_directories(
     ${MinhookPath}/include
@@ -37,7 +43,7 @@ add_library(MyLibrary SHARED
 
 target_link_libraries(MyLibrary minhook.x64  )
 
-target_link_libraries(MyLibrary2 minhook.x64 Qt5::Widgets Qt5::Core)
+target_link_libraries(MyLibrary2 minhook.x64 Qt5::Widgets Qt5::Core Qt5::WebView Qt5::WebEngine Qt5::WebEngineWidgets Qt5::Quick Qt5::QuickWidgets)
 
 # 设置库的公共头文件路径
 target_include_directories(MyLibrary PUBLIC

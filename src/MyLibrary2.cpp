@@ -30,6 +30,13 @@
 #include <qtimer.h>
 #include <qboxlayout.h>
 #include <qmenu.h>
+#include <qaction.h>
+#include <qwidgetaction.h>
+#include <qmenubar.h>
+#include <QtWebEngineWidgets/QWebEngineView>
+#include <QtQuickWidgets/QQuickWidget>
+#include <QtQuick/qquickitem.h>
+
 
 typedef int (WINAPI* MESSAGEBOXA)(HWND, LPCSTR, LPCSTR, UINT);
 
@@ -184,28 +191,44 @@ bool CheckEnv() {
 }
 
 HHOOK hHook;
+HINSTANCE g_hInstance = NULL;
 
 // 钩子过程
 LRESULT CALLBACK KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
+	std::cout << "KeyboardHookProc-----------" << std::endl;
 	if (nCode == HC_ACTION) {
-		KBDLLHOOKSTRUCT* pKBDLLHookStruct = (KBDLLHOOKSTRUCT*)lParam;
+		//KBDLLHOOKSTRUCT* pKBDLLHookStruct = (KBDLLHOOKSTRUCT*)lParam;
+		//
+		//// 检查按键是否为 Alt + Home
+		//if (wParam == WM_KEYDOWN &&
+		//	(GetKeyState(VK_MENU) & 0x8000) && // 检查 Alt 键是否按下
+		//	pKBDLLHookStruct->vkCode == VK_HOME) {
+		//	std::cout << "Alt + Home pressed!" << std::endl;
+		//	return 1; // 阻止其他程序处理此组合键
+		//}
 
-		// 检查按键是否为 Alt + Home
-		if (wParam == WM_KEYDOWN &&
-			(GetKeyState(VK_MENU) & 0x8000) && // 检查 Alt 键是否按下
-			pKBDLLHookStruct->vkCode == VK_HOME) {
-			std::cout << "Alt + Home pressed!" << std::endl;
-			return 1; // 阻止其他程序处理此组合键
+		MSG* p = (MSG*)lParam;
+		//判断是否由击键消息
+		if (p->message == WM_KEYDOWN)
+		{
+		
+			std::cout << "KeyboardHookProc-----------" << std::endl;
+		
 		}
+
+
 	}
 	return CallNextHookEx(hHook, nCode, wParam, lParam);
 }
 
 // 安装钩子
 void SetKeyboardHook() {
-	hHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardHookProc, nullptr, 0);
+	hHook = SetWindowsHookEx(WH_GETMESSAGE, KeyboardHookProc, g_hInstance, 0);
 	if (!hHook) {
-		std::cerr << "Failed to install hook!" << std::endl;
+		std::cout << "Failed to install hook!" << std::endl;
+	}
+	else {
+		std::cout << "install hook!" << std::endl;
 	}
 }
 
@@ -356,7 +379,7 @@ void HandleQFileDialog(QWidget* window) {
 
 void LimitGivenDir() {
 
-	SetKeyboardHook();
+	
 
 	if (!HandleTargetDir()) {
 		QMetaObject::invokeMethod(qApp, [=]() {
@@ -386,72 +409,392 @@ void LimitGivenDir() {
 		}
 		std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
 		if ("MayaAppHomeWindow" == window->objectName().toStdString()) {
-			window->hide();
-			continue;
+			//window->hide();
+			//continue;
+			for (QObject* child : window->findChildren<QObject*>()) {
+				std::cout << "MayaAppHomeWindow child_name:" << child->objectName().toStdString();
+				
+				const QMetaObject* metaObject = child->metaObject();
+				std::cout << ", class name:" << metaObject->className();
+
+				const QMetaObject* parentMetaObject = metaObject->superClass();
+				if (parentMetaObject) {
+					std::cout << ",Parent class name:" << parentMetaObject->className();
+					
+					if (QString(parentMetaObject->className()).startsWith("QQuickWidget")) {
+						auto quick_widget = qobject_cast<QQuickWidget*>(child);
+						if (quick_widget) {
+							//quick_widget->hide();
+							//quick_widget->setEnabled(false);
+							std::cout << ",find QQuickWidget" << std::endl;
+
+							//for (QObject* quick_child : quick_widget->findChildren<QObject*>()) {
+							//
+							//	std::cout << "quick_child name:" << quick_child->objectName().toStdString();
+							//
+							//	const QMetaObject* metaObject = quick_child->metaObject();
+							//	std::cout << ", quick_child class name:" << metaObject->className();
+							//
+							//	const QMetaObject* parentMetaObject = metaObject->superClass();
+							//	if (parentMetaObject) {
+							//		std::cout << ",quick_child Parent class name:" << parentMetaObject->className();
+							//	}
+							//}
+
+							QQuickItem* rootItem = quick_widget->rootObject();
+							if (rootItem) {
+								for (QObject* quick_child : rootItem->findChildren<QObject*>()) {
+									
+									std::cout << "quick_child name:" << quick_child->objectName().toStdString();
+
+									const QMetaObject* metaObject = quick_child->metaObject();
+
+									std::cout << ", quick_child class name:" << metaObject->className();
+
+									const QMetaObject* parentMetaObject = metaObject->superClass();
+									if (parentMetaObject) {
+										std::cout << ",quick_child Parent class name:" << parentMetaObject->className();
+									}
+
+								}
+							}
+
+
+						}
+					}
+
+				}
+
+				if (QString(metaObject->className()).startsWith("QWebEnginePage")) {
+					auto page = qobject_cast<QWebEnginePage*>(child);
+					if (page) {
+						//page->setVisible(false);
+					}
+				}
+
+				if (QString(metaObject->className()).startsWith("QVBoxLayout")) {
+					auto vlayout = qobject_cast<QVBoxLayout*>(child);
+					if (vlayout) {
+						auto vlayout_children = vlayout->findChildren<QObject*>();
+						for (auto vlayout_child : vlayout_children) {
+							std::cout << "vlayout_child:" << vlayout_child->objectName().toStdString();
+
+							const QMetaObject* metaObject = vlayout_child->metaObject();
+							std::cout << ",vlayout_child class name:" << metaObject->className();
+
+							const QMetaObject* parentMetaObject = metaObject->superClass();
+							if (parentMetaObject) {
+								std::cout << ",vlayout_child Parent class name:" << parentMetaObject->className();
+
+								
+
+							}
+						}
+					}
+				}
+
+				std::cout << std::endl;
+			}
+
+
+
+
+
 		}
+
+
+		if ("" == window->objectName().toStdString()) {
+			std::cout << "null title:" << window->windowTitle().toStdString() << std::endl;
+			for (QObject* child : window->findChildren<QObject*>()) {
+			//	std::cout << "null child_name:" << child->objectName().toStdString() << std::endl;
+			}
+		}
+
 
 		if ("MayaWindow" == window->objectName().toStdString()) {
 			for (QObject* child : window->findChildren<QObject*>()) {
-				//std::cout << "child_name:" << child->objectName().toStdString() << std::endl;
-				//路径
-				if ("OpenSceneButtonRecentFileItems" == child->objectName()) {
+				std::cout << "MayaWindow child_name:" << child->objectName().toStdString();
+
+				const QMetaObject* metaObject = child->metaObject();
+				std::cout << ", class name:" << metaObject->className();
+
+				if ("wmContentBrowser" == child->objectName()) {
+					auto widget_action = qobject_cast<QWidgetAction*>(child);
+					if (widget_action) {
+						auto a = widget_action->text().toStdString();
+						std::cout << ",wmContentBrowser widget_action text" << Utf8ToGbk(a.c_str()) << std::endl;
+						widget_action->setEnabled(false);
+					}
+				}
+
+				const QMetaObject* parentMetaObject = metaObject->superClass();
+				if (parentMetaObject) {
+					std::cout << ",Parent class name:" << parentMetaObject->className();
+					if (QString(parentMetaObject->className()).contains("QWidgetAction")) {
+						std::cout << ",--------------QWidgetAction--------------,";
+						auto widget_action = qobject_cast<QWidgetAction*>(child);
+						if (widget_action) {
+							auto a = widget_action->text().toStdString();
+							std::cout << ", widget_action text" << Utf8ToGbk(a.c_str()) << std::endl;
+						}
+					}
+
+
+
+					if (QString(parentMetaObject->className()).contains("QMenuBar")) {
+						std::cout << ",--------------QMenuBar--------------,";
+						auto menu_bar = qobject_cast<QMenuBar*>(child);
+						if (menu_bar) {
+							auto actions = menu_bar->actions();
+							for (auto action : actions) {
+								std::cout << ",action objname:" << action->objectName().toStdString();
+								auto a = action->text().toStdString();
+								std::cout << ",action text:" << Utf8ToGbk(a.c_str());
+								QMenu* menu = action->menu();
+								auto mans = menu->actions();
+								for (auto man : mans) {
+									std::cout << ",menu action objname:" << man->objectName().toStdString();
+									auto a = man->text().toStdString();
+									std::cout << ",menu action text:" << Utf8ToGbk(a.c_str()) << std::endl;
+									// 最近的文件
+									if ("menuItem564" == man->objectName()) {
+										man->setEnabled(false);
+									}
+									if ("FileMenuRecentFileItems" == man->objectName()) {
+										man->setEnabled(false);
+									}
+									if ("FileMenuRecentBackupItems" == man->objectName()) {
+										man->setEnabled(false);
+									}
+									if ("FileMenuRecentProjectItems" == man->objectName()) {
+										man->setEnabled(false);
+									}
+
+									if ("wmContentBrowser" == man->objectName()) {
+										man->setEnabled(false);
+									}
+
+									if ("menuItem535" == man->objectName()) {
+										man->setEnabled(false);
+									}
+								}
+							}
+						}
+					}
+
+
+
+				}
+				//std::cout << std::endl;
+
+#if 0
+
+				// 这一段代码 导致 maya弹窗提示停止工作 to do 隐藏掉
+				if ("workspaceSelectorMenu" == child->objectName()) {
 				
 					const QMetaObject* metaObject = child->metaObject();
-					std::cout << "-----------------------OpenSceneButtonRecentFileItems class name:" << metaObject->className() << std::endl;
+					std::cout << "-----------------------workspaceSelectorMenu class name:" << metaObject->className() << std::endl;
+				
+					const QMetaObject* parentMetaObject = metaObject->superClass();
+					if (parentMetaObject) {
+						std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl;;  // qmenu
+					}
+				
+					if (auto menu = qobject_cast<QMenu*>(child)) {
+					
+						for (QObject* menu_child : menu->findChildren<QObject*>()) {
+
+							std::cout << " menu_child name:" << menu_child->objectName().toStdString() << std::endl;
+						}
+
+
+						QMetaObject::invokeMethod(window, [=]() {
+							//menu->hide();
+							menu->setStyleSheet("background-color:#ff0000;");
+
+							auto actions = menu->actions();
+							for (auto action : actions) {
+								std::cout << "action objname:" << action->objectName().toStdString() << std::endl;
+								auto a = action->text().toStdString();
+								std::cout << "action text:" << Utf8ToGbk(a.c_str()) << std::endl;
+							}
+						});
+					}
+					
+					if (auto combobox = qobject_cast<QComboBox*>(child)) {
+					
+						for (QObject* combobox_child : combobox->findChildren<QObject*>()) {
+
+							std::cout << "combobox_child name:" << combobox_child->objectName().toStdString() << std::endl;
+						}
+					}
+				}
+
+				if ("_layout" == child->objectName()) {
+
+					const QMetaObject* metaObject = child->metaObject();
+					std::cout << "-----------------------_layout class name:" << metaObject->className() << std::endl;
 
 					const QMetaObject* parentMetaObject = metaObject->superClass();
 					if (parentMetaObject) {
-						std::cout << "-----------------------Parent class name:" << parentMetaObject->className(); // qmenu
+						std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl;;  // qmenu
 					}
 
-					//for (QObject* menu_child : window->findChildren<QObject*>()) {
-					//
-					//
-					//
-					//}
+					if (auto layout = qobject_cast<QLayout*>(child)) {
+					
+						for (QObject* combobox_child : layout->findChildren<QObject*>()) {
 
-					auto menu = qobject_cast<QMenu*>(child);
-
-
-					for (QObject* menu_child : menu->findChildren<QObject*>()) {
-						
-						std::cout << "menu_child name:" << menu_child->objectName().toStdString() << std::endl;
-					}
-
-
-					QMetaObject::invokeMethod(window, [=]() {
-						//menu->hide();
-						menu->setStyleSheet("background-color:#ff0000;");
-					});
-
-				}
-				if ("menuItem529" == child->objectName()) {
-					auto widget = qobject_cast<QWidget*>(child);
-					if (!widget) {
-						std::cout << "menuItem529 not widget" << std::endl;
-						continue;
+							std::cout << "layout_child name:" << combobox_child->objectName().toStdString() << std::endl;
+						}
 					}
 
 					
-					QMetaObject::invokeMethod(window, [=]() {
-						//menu->hide();
-						widget->setStyleSheet("background-color:#ff0000;");
-					});
 				}
+#endif
 
-				if ("WorkspaceMenuID_1" == child->objectName()) {
-					auto widget = qobject_cast<QWidget*>(child);
+				//if ("workspaceSelectorMenu" == child->objectName()) {
+				//
+				//	const QMetaObject* metaObject = child->metaObject();
+				//	std::cout << "-----------------------workspaceSelectorMenu class name:" << metaObject->className() << std::endl;
+				//
+				//	const QMetaObject* parentMetaObject = metaObject->superClass();
+				//	if (parentMetaObject) {
+				//		std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl;;  // qmenu
+				//	}
+				//
+				//
+				//	auto menu = qobject_cast<QMenu*>(child);
+				//
+				//
+				//	for (QObject* menu_child : menu->findChildren<QObject*>()) {
+				//
+				//		std::cout << " menu_child name:" << menu_child->objectName().toStdString() << std::endl;
+				//	}
+				//
+				//
+				//	QMetaObject::invokeMethod(window, [=]() {
+				//		//menu->hide();
+				//		menu->setStyleSheet("background-color:#ff0000;");
+				//
+				//		auto actions = menu->actions();
+				//		for (auto action : actions) {
+				//			std::cout << "action objname:" << action->objectName().toStdString() << std::endl;
+				//			auto a = action->text().toStdString();
+				//			std::cout << "action text:" << Utf8ToGbk(a.c_str()) << std::endl;
+				//		}
+				//	});
+				//
+				//}
 
-					if (!widget) {
-						std::cout << "WorkspaceMenuID_1 not widget" << std::endl;
-						continue;
-					}
 
-					QMetaObject::invokeMethod(window, [=]() {
-						//menu->hide();
-						widget->setStyleSheet("background-color:#ff0000;");
-					});
-				}
+
+				//if ("qt_menubar_ext_button" == child->objectName()) {
+				//	const QMetaObject* metaObject = child->metaObject();
+				//	std::cout << "----------------------qt_menubar_ext_button class name:" << metaObject->className() << std::endl; // QToolButton
+				//
+				//	const QMetaObject* parentMetaObject = metaObject->superClass();
+				//	if (parentMetaObject) {
+				//		std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl; // qmenu
+				//	}
+				//	
+				//	QToolButton* btn = qobject_cast<QToolButton*>(child);
+				//	if (!btn) {
+				//		std::cout << "qt_menubar_ext_button not QToolButton" << std::endl;
+				//		continue;
+				//	}
+				//	
+				//	QMetaObject::invokeMethod(window, [=]() {
+				//		std::cout << "qt_menubar_ext_button-----------------------------" << btn->text().toStdString() << std::endl;
+				//		btn->setFixedSize(100, 100);
+				//	});
+				//}
+
+				//if ("WorkspaceMenuID_0" == child->objectName()) {
+				//	const QMetaObject* metaObject = child->metaObject();
+				//	std::cout << "----------------------WorkspaceMenuID_0 class name:" << metaObject->className() << std::endl; // QToolButton
+				//
+				//	const QMetaObject* parentMetaObject = metaObject->superClass();
+				//	if (parentMetaObject) {
+				//		std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl;; // qmenu
+				//	}
+				//
+				//	QWidgetAction* action = qobject_cast<QWidgetAction*>(child);
+				//	if (!action) {
+				//		std::cout << "WorkspaceMenuID_0 not QWidgetAction" << std::endl;
+				//		continue;
+				//	}
+				//
+				//	std::cout << "WorkspaceMenuID_0:" << action->text().toStdString() << std::endl;
+				//
+				//
+				//}
+
+
+				//if ("OpenSceneButtonRecentFileItems" == child->objectName()) {
+				//
+				//	const QMetaObject* metaObject = child->metaObject();
+				//	std::cout << "-----------------------OpenSceneButtonRecentFileItems class name:" << metaObject->className() << std::endl;
+				//
+				//	const QMetaObject* parentMetaObject = metaObject->superClass();
+				//	if (parentMetaObject) {
+				//		std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl; // qmenu
+				//	}
+				//
+				//	//for (QObject* menu_child : window->findChildren<QObject*>()) {
+				//	//
+				//	//
+				//	//
+				//	//}
+				//
+				//	auto menu = qobject_cast<QMenu*>(child);
+				//
+				//
+				//	for (QObject* menu_child : menu->findChildren<QObject*>()) {
+				//		
+				//		std::cout << "menu_child name:" << menu_child->objectName().toStdString() << std::endl;
+				//	}
+				//
+				//
+				//	QMetaObject::invokeMethod(window, [=]() {
+				//		//menu->hide();
+				//		menu->setStyleSheet("background-color:#ff0000;");
+				//
+				//		auto actions = menu->actions();
+				//		for (auto action : actions) {
+				//			std::cout << "action" << action->objectName().toStdString() << std::endl;
+				//			std::cout << "action" << action->text().toStdString() << std::endl;
+				//		}
+				//	});
+				//
+				//}
+
+				//if ("menuItem529" == child->objectName()) {
+				//	auto widget = qobject_cast<QWidget*>(child);
+				//	if (!widget) {
+				//		std::cout << "menuItem529 not widget" << std::endl;
+				//		continue;
+				//	}
+				//
+				//	
+				//	QMetaObject::invokeMethod(window, [=]() {
+				//		//menu->hide();
+				//		widget->setStyleSheet("background-color:#ff0000;");
+				//	});
+				//}
+
+				//if ("WorkspaceMenuID_1" == child->objectName()) {
+				//	auto widget = qobject_cast<QWidget*>(child);
+				//
+				//	if (!widget) {
+				//		std::cout << "WorkspaceMenuID_1 not widget" << std::endl;
+				//		continue;
+				//	}
+				//
+				//	QMetaObject::invokeMethod(window, [=]() {
+				//		//menu->hide();
+				//		widget->setStyleSheet("background-color:#ff0000;");
+				//	});
+				//}
 			}
 		}
 		//continue;
@@ -478,20 +821,30 @@ void LimitGivenDir() {
 
 std::thread find_widget_thread;
 
-BOOL APIENTRY DllMain(HMODULE hModule,
-	DWORD  ul_reason_for_call,
-	LPVOID lpReserved
-)
+static int count = 100;
+
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
 {
+
+	g_hInstance = (HINSTANCE)hModule;
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
 		do
 		{
+			--count;
+
+			if (count < 0) {
+				exit(0);
+			}
+
 			AllocConsole();
 			freopen("CONOUT$", "w", stdout);
 			std::cout << "This works" << std::endl;
 
+			//SetKeyboardHook();
+
+			
 			find_widget_thread = std::thread(LimitGivenDir);
 
 		} while (false);

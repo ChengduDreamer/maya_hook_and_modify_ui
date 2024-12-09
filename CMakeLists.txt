@@ -10,6 +10,9 @@ set(QT_ROOT F:/Qt5/5.15/5.15.2/msvc2019_64)
 
 set(CMAKE_PREFIX_PATH ${QT_ROOT}/lib/cmake)
 
+add_compile_options("$<$<C_COMPILER_ID:MSVC>:/utf-8>")
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+
 set(MinhookPath ${CMAKE_CURRENT_SOURCE_DIR}/minhook)
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)

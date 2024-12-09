@@ -33,6 +33,9 @@
 #include <qaction.h>
 #include <qwidgetaction.h>
 #include <qmenubar.h>
+#include <locale>
+#include <string>
+#include <codecvt>
 #include <QtWebEngineWidgets/QWebEngineView>
 #include <QtQuickWidgets/QQuickWidget>
 #include <QtQuick/qquickitem.h>
@@ -58,12 +61,12 @@ GetLongPathNameWPtr GetLongPathNameW_ptr = NULL;
 
 GetLogicalDrivesPtr GetLogicalDrives_ptr = NULL;
 
-MESSAGEBOXA fpMessageBoxA = NULL;//Ö¸ÏòÔ­MessageBoxAµÄÖ¸Õë
+MESSAGEBOXA fpMessageBoxA = NULL;//æŒ‡å‘åŸMessageBoxAçš„æŒ‡é’ˆ
 
-//ÓÃÀ´Ìæ´úÔ­º¯ÊıµÄMessageBoxº¯Êı
+//ç”¨æ¥æ›¿ä»£åŸå‡½æ•°çš„MessageBoxå‡½æ•°
 int WINAPI DetourMessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType)
 {
-	//ÕâÀïÖ»×ö¼òµ¥µÄĞŞ¸Ä²ÎÊı£¬ÆäÊµ¿ÉÒÔ×öºÜ¶àÊÂÇé£¬ÉõÖÁ²»È¥µ÷ÓÃÔ­º¯Êı
+	//è¿™é‡Œåªåšç®€å•çš„ä¿®æ”¹å‚æ•°ï¼Œå…¶å®å¯ä»¥åšå¾ˆå¤šäº‹æƒ…ï¼Œç”šè‡³ä¸å»è°ƒç”¨åŸå‡½æ•°
 	return fpMessageBoxA(hWnd, "Hooked!", lpCaption, uType);
 }
 
@@ -72,8 +75,8 @@ DWORD WINAPI DetourGetLogicalDrives(VOID) {
 	std::cout << "0 drives = " << drives << std::endl;
 	drives &= ~(1 << 2);
 	std::cout << "1 drives = " << drives << std::endl;
-	// return 0; ÄÜ¿´µ½C  G ÅÌ
-	return 64; // Ä¿±êÊÇGÅÌ
+	// return 0; èƒ½çœ‹åˆ°C  G ç›˜
+	return 64; // ç›®æ ‡æ˜¯Gç›˜
 	//return GetLogicalDrives_ptr();
 }
 
@@ -147,18 +150,18 @@ bool CheckEnv() {
 		DWORD bufferSize = 256;
 		char value[256] = { 0, };
 		DWORD result = GetEnvironmentVariableA(varName, value, bufferSize);
-		if (result > 0 && result < bufferSize) {// ³É¹¦»ñÈ¡»·¾³±äÁ¿
+		if (result > 0 && result < bufferSize) {// æˆåŠŸè·å–ç¯å¢ƒå˜é‡
 			std::cout << varName << " = " << value << std::endl;
 			std::string real_value = value;
 			if (real_value != expect_value) {
 				return false;
 			}
 		}
-		else if (result == 0) { // »·¾³±äÁ¿²»´æÔÚ
+		else if (result == 0) { // ç¯å¢ƒå˜é‡ä¸å­˜åœ¨
 			std::cout << varName << " is not set." << std::endl;
 			return false;
 		}
-		else { // »º³åÇø²»¹»´ó
+		else { // ç¼“å†²åŒºä¸å¤Ÿå¤§
 			return false;
 			std::cout << "Buffer size is too small. Required size: " << result << std::endl;
 			return false;
@@ -171,18 +174,18 @@ bool CheckEnv() {
 		DWORD bufferSize = 256;
 		char value[256] = { 0, };
 		DWORD result = GetEnvironmentVariableA(varName, value, bufferSize);
-		if (result > 0 && result < bufferSize) {// ³É¹¦»ñÈ¡»·¾³±äÁ¿
+		if (result > 0 && result < bufferSize) {// æˆåŠŸè·å–ç¯å¢ƒå˜é‡
 			std::cout << varName << " = " << value << std::endl;
 			std::string real_value = value;
 			if (real_value != expect_value) {
 				return false;
 			}
 		}
-		else if (result == 0) { // »·¾³±äÁ¿²»´æÔÚ
+		else if (result == 0) { // ç¯å¢ƒå˜é‡ä¸å­˜åœ¨
 			std::cout << varName << " is not set." << std::endl;
 			return false;
 		}
-		else { // »º³åÇø²»¹»´ó
+		else { // ç¼“å†²åŒºä¸å¤Ÿå¤§
 			std::cout << "Buffer size is too small. Required size: " << result << std::endl;
 			return false;
 		}
@@ -193,22 +196,22 @@ bool CheckEnv() {
 HHOOK hHook;
 HINSTANCE g_hInstance = NULL;
 
-// ¹³×Ó¹ı³Ì
+// é’©å­è¿‡ç¨‹
 LRESULT CALLBACK KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	std::cout << "KeyboardHookProc-----------" << std::endl;
 	if (nCode == HC_ACTION) {
 		//KBDLLHOOKSTRUCT* pKBDLLHookStruct = (KBDLLHOOKSTRUCT*)lParam;
 		//
-		//// ¼ì²é°´¼üÊÇ·ñÎª Alt + Home
+		//// æ£€æŸ¥æŒ‰é”®æ˜¯å¦ä¸º Alt + Home
 		//if (wParam == WM_KEYDOWN &&
-		//	(GetKeyState(VK_MENU) & 0x8000) && // ¼ì²é Alt ¼üÊÇ·ñ°´ÏÂ
+		//	(GetKeyState(VK_MENU) & 0x8000) && // æ£€æŸ¥ Alt é”®æ˜¯å¦æŒ‰ä¸‹
 		//	pKBDLLHookStruct->vkCode == VK_HOME) {
 		//	std::cout << "Alt + Home pressed!" << std::endl;
-		//	return 1; // ×èÖ¹ÆäËû³ÌĞò´¦Àí´Ë×éºÏ¼ü
+		//	return 1; // é˜»æ­¢å…¶ä»–ç¨‹åºå¤„ç†æ­¤ç»„åˆé”®
 		//}
 
 		MSG* p = (MSG*)lParam;
-		//ÅĞ¶ÏÊÇ·ñÓÉ»÷¼üÏûÏ¢
+		//åˆ¤æ–­æ˜¯å¦ç”±å‡»é”®æ¶ˆæ¯
 		if (p->message == WM_KEYDOWN)
 		{
 		
@@ -221,7 +224,7 @@ LRESULT CALLBACK KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	return CallNextHookEx(hHook, nCode, wParam, lParam);
 }
 
-// °²×°¹³×Ó
+// å®‰è£…é’©å­
 void SetKeyboardHook() {
 	hHook = SetWindowsHookEx(WH_GETMESSAGE, KeyboardHookProc, g_hInstance, 0);
 	if (!hHook) {
@@ -232,42 +235,42 @@ void SetKeyboardHook() {
 	}
 }
 
-// ¿¼ÂÇÈİ´í»úÖÆ
-// maya Èí¼ş°æ±¾ÎÊÌâ Ö§³Ö2024
-// ¿¼ÂÇ g:/temp  g:/temp1234 ÕâÑùµÄ  ²âÊÔÒ»ÏÂ äÖÈ¾¶ËµÄÈ¨ÏŞ¿ØÖÆ
-// Âí¿µÌ©Ó³ÉäÄ¿Â¼ ´«²ÎÄÇÀï
-// -noAutoloadPlugins ²»¼ÓÔØÈÎºÎ²å¼ş
+// è€ƒè™‘å®¹é”™æœºåˆ¶
+// maya è½¯ä»¶ç‰ˆæœ¬é—®é¢˜ æ”¯æŒ2024
+// è€ƒè™‘ g:/temp  g:/temp1234 è¿™æ ·çš„  æµ‹è¯•ä¸€ä¸‹ æ¸²æŸ“ç«¯çš„æƒé™æ§åˆ¶
+// é©¬åº·æ³°æ˜ å°„ç›®å½• ä¼ å‚é‚£é‡Œ
+// -noAutoloadPlugins ä¸åŠ è½½ä»»ä½•æ’ä»¶
 
 // MAYA_NO_HOME_ICON
 // MAYA_NO_HOME
 
-// »Øµ½Ö÷Ò³  ¿ì½İ¼ü
-// ÄÚÈİä¯ÀÀÆ÷
-// ²å¼ş¹ÜÀíÆ÷
-
+// å›åˆ°ä¸»é¡µ  å¿«æ·é”®
+// å†…å®¹æµè§ˆå™¨
+// æ’ä»¶ç®¡ç†å™¨
+// è„šæœ¬ç®¡ç†å™¨ é‡Œé¢çš„å¸®åŠ©
 
 /*
-±êÖ¾:
--v                       ´òÓ¡²úÆ·°æ±¾ºÍÊ¶±ğ±àºÅ
--batch                   ÊÊÓÃÓÚÅú´¦ÀíÄ£Ê½
--prompt                  ÊÊÓÃÓÚ½»»¥Ê½·Ç GUI Ä£Ê½
--proj [dir]              ÔÚÖ¸¶¨µÄÏîÄ¿Ä¿Â¼ÖĞ²éÕÒÎÄ¼ş
--command [mel command]   Æô¶¯Ê±ÔËĞĞÖ¸¶¨µÄÃüÁî
--file [file]             ´ò¿ªÖ¸¶¨µÄÎÄ¼ş
--script [file]           Æô¶¯Ê±Ô´»¯Ö¸¶¨ÎÄ¼ş
--log [file]              ½« stdout ÏûÏ¢ºÍ stderr ÏûÏ¢¸´ÖÆµ½Ö¸¶¨ÎÄ¼ş
-							 (Ê¹ÓÃÍêÕûÎÄ¼şÃû)
--hideConsole              Òş²Ø¿ØÖÆÌ¨´°¿Ú
--recover                 »Ö¸´ÉÏÒ»ÈÕÖ¾ÎÄ¼ş
-							 (Ê¹ÓÃ¡°Render -help¡±»ñµÃ¸ü¶àÑ¡Ïî)
+æ ‡å¿—:
+-v                       æ‰“å°äº§å“ç‰ˆæœ¬å’Œè¯†åˆ«ç¼–å·
+-batch                   é€‚ç”¨äºæ‰¹å¤„ç†æ¨¡å¼
+-prompt                  é€‚ç”¨äºäº¤äº’å¼é GUI æ¨¡å¼
+-proj [dir]              åœ¨æŒ‡å®šçš„é¡¹ç›®ç›®å½•ä¸­æŸ¥æ‰¾æ–‡ä»¶
+-command [mel command]   å¯åŠ¨æ—¶è¿è¡ŒæŒ‡å®šçš„å‘½ä»¤
+-file [file]             æ‰“å¼€æŒ‡å®šçš„æ–‡ä»¶
+-script [file]           å¯åŠ¨æ—¶æºåŒ–æŒ‡å®šæ–‡ä»¶
+-log [file]              å°† stdout æ¶ˆæ¯å’Œ stderr æ¶ˆæ¯å¤åˆ¶åˆ°æŒ‡å®šæ–‡ä»¶
+							 (ä½¿ç”¨å®Œæ•´æ–‡ä»¶å)
+-hideConsole              éšè—æ§åˆ¶å°çª—å£
+-recover                 æ¢å¤ä¸Šä¸€æ—¥å¿—æ–‡ä»¶
+							 (ä½¿ç”¨â€œRender -helpâ€è·å¾—æ›´å¤šé€‰é¡¹)
 -optimizeRender [file] [outfile]
-						 ÎªäÖÈ¾Ä¿µÄÓÅ»¯ maya ÎÄ¼ş
-							 Ğ§ÂÊ£¬²¢½«½á¹ûÖÃÓÚÊä³öÎÄ¼şÖĞ
-					  (Ê¹ÓÃ¡°maya -optimizeRender -help¡±»ñµÃ¸ü¶àÑ¡Ïî)
--archive [file]          ÏÔÊ¾¹éµµÖ¸¶¨³¡¾°ËùĞèµÄÎÄ¼şÁĞ±í
--noAutoloadPlugins       ²»Òª×Ô¶¯¼ÓÔØÈÎºÎ²å¼ş¡£
--3                       ÆôÓÃ Python 3000 ¼æÈİĞÔ¾¯¸æ
--help                    ´òÓ¡´ËÏûÏ¢
+						 ä¸ºæ¸²æŸ“ç›®çš„ä¼˜åŒ– maya æ–‡ä»¶
+							 æ•ˆç‡ï¼Œå¹¶å°†ç»“æœç½®äºè¾“å‡ºæ–‡ä»¶ä¸­
+					  (ä½¿ç”¨â€œmaya -optimizeRender -helpâ€è·å¾—æ›´å¤šé€‰é¡¹)
+-archive [file]          æ˜¾ç¤ºå½’æ¡£æŒ‡å®šåœºæ™¯æ‰€éœ€çš„æ–‡ä»¶åˆ—è¡¨
+-noAutoloadPlugins       ä¸è¦è‡ªåŠ¨åŠ è½½ä»»ä½•æ’ä»¶ã€‚
+-3                       å¯ç”¨ Python 3000 å…¼å®¹æ€§è­¦å‘Š
+-help                    æ‰“å°æ­¤æ¶ˆæ¯
 */
 
 void HandleQFileDialog(QWidget* window) {
@@ -278,7 +281,7 @@ void HandleQFileDialog(QWidget* window) {
 
 	for (QObject* child : window->findChildren<QObject*>()) {
 		//std::cout << "child_name:" << child->objectName().toStdString() /*<< std::endl*/;
-		//Â·¾¶
+		//è·¯å¾„
 		if ("lookInCombo" == child->objectName().toStdString()) {
 			if (combo_box = qobject_cast<QComboBox*>(child)) {
 				QMetaObject::invokeMethod(window, [=]() {
@@ -288,7 +291,7 @@ void HandleQFileDialog(QWidget* window) {
 					if (!g_current_path.startsWith(g_root_2_path)) {
 
 						std::cout << "-----------not startsWith:" << g_root_2_path.toStdString() << std::endl;
-						combo_box->setEnabled(true); // Èç¹ûÎªfalse,ÎŞ·¨ÏìÓ¦QKeyEvent
+						combo_box->setEnabled(true); // å¦‚æœä¸ºfalse,æ— æ³•å“åº”QKeyEvent
 						combo_box->setCurrentText(g_root_2_path);
 						QKeyEvent key_event{ QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier };
 						bool res = QCoreApplication::sendEvent(combo_box, &key_event);
@@ -308,7 +311,7 @@ void HandleQFileDialog(QWidget* window) {
 		if ("qt_filesystem_model" == child->objectName().toStdString()) {
 			if (file_system_model = qobject_cast<QFileSystemModel*>(child)) {
 				QMetaObject::invokeMethod(window, [=]() {
-					//file_system_model->setRootPath(g_root_1_path); // ÕâÑùÖ»»áĞŞ¸ÄÎÄ±¾¿òÀïÃæµÄÖµ
+					//file_system_model->setRootPath(g_root_1_path); // è¿™æ ·åªä¼šä¿®æ”¹æ–‡æœ¬æ¡†é‡Œé¢çš„å€¼
 					});
 			}
 		}
@@ -345,7 +348,7 @@ void HandleQFileDialog(QWidget* window) {
 		if ("projectArea" == child->objectName().toStdString()) {
 			if (QWidget* widget = qobject_cast<QWidget*>(child)) {
 				QMetaObject::invokeMethod(window, [=]() {
-					widget->setStyleSheet("background-color:#00ff00;"); // ×óÏÂ½ÇÏîÄ¿ÄÇ¿é
+					widget->setStyleSheet("background-color:#00ff00;"); // å·¦ä¸‹è§’é¡¹ç›®é‚£å—
 					widget->hide();
 					});
 			}
@@ -354,18 +357,18 @@ void HandleQFileDialog(QWidget* window) {
 		if ("ProjectFoldersSplitter" == child->objectName().toStdString()) {
 			if (QWidget* projwidget = qobject_cast<QWidget*>(child)) {
 				QMetaObject::invokeMethod(window, [=]() {
-					projwidget->setStyleSheet("background-color:#0000ff;"); // ×óÉÏ½ÇÎÄ¼ş¼ĞÄÇ¿é
+					projwidget->setStyleSheet("background-color:#0000ff;"); // å·¦ä¸Šè§’æ–‡ä»¶å¤¹é‚£å—
 					projwidget->hide();
 					});
 				for (QObject* projchild : projwidget->findChildren<QObject*>()) {
 					//std::cout << "ProjectFoldersSplitter child_name:" << projchild->objectName().toStdString() << std::endl;
-					//projectArea //Ã»·´Ó¦
+					//projectArea //æ²¡ååº”
 					// qt_scrollarea_viewport
 					if ("qt_scrollarea_viewport" == projchild->objectName().toStdString()) {
 						if (QWidget* qt_scrollarea_viewport = qobject_cast<QWidget*>(projchild)) {
 							std::cout << "qt_scrollarea_viewport to QWidget" << std::endl;
 							QMetaObject::invokeMethod(window, [=]() {
-								qt_scrollarea_viewport->setStyleSheet("background-color:#ffff00;"); //ÓĞ×óÉÏ½Ç ÎÄ¼ş¼ĞÁĞ±í
+								qt_scrollarea_viewport->setStyleSheet("background-color:#ffff00;"); //æœ‰å·¦ä¸Šè§’ æ–‡ä»¶å¤¹åˆ—è¡¨
 								qt_scrollarea_viewport->hide();
 								});
 						}
@@ -376,6 +379,12 @@ void HandleQFileDialog(QWidget* window) {
 	}
 }
 
+static std::string ToUTF8(const std::wstring& src) {
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	return converter.to_bytes(src);
+}
+
+QWidget* workspace_window = nullptr;
 
 void LimitGivenDir() {
 
@@ -409,7 +418,14 @@ void LimitGivenDir() {
 		}
 		std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
 		if ("MayaAppHomeWindow" == window->objectName().toStdString()) {
-			//window->hide();
+			
+
+			QMetaObject::invokeMethod(qApp, [=]() {
+				workspace_window->show();
+				window->hide();
+			});
+			continue;
+
 			//continue;
 			for (QObject* child : window->findChildren<QObject*>()) {
 				std::cout << "MayaAppHomeWindow child_name:" << child->objectName().toStdString();
@@ -495,28 +511,41 @@ void LimitGivenDir() {
 
 				std::cout << std::endl;
 			}
-
-
-
-
-
-		}
-
-
-		if ("" == window->objectName().toStdString()) {
+		} else if ("" == window->objectName().toStdString()) {
 			std::cout << "null title:" << window->windowTitle().toStdString() << std::endl;
 			for (QObject* child : window->findChildren<QObject*>()) {
 			//	std::cout << "null child_name:" << child->objectName().toStdString() << std::endl;
 			}
-		}
+		} else if ("AboutArnold" == window->objectName().toStdString()) {
+			QMetaObject::invokeMethod(qApp, [=]() {
+				window->close();
+			});
+		} else if ("MayaWindow" == window->objectName().toStdString()) {
 
+			workspace_window = window;
 
-		if ("MayaWindow" == window->objectName().toStdString()) {
+			std::wstring lzh_help_sign = L"å¸®åŠ©";
+
+			std::wstring lus_help_sign = L"help";
+
+			std::string zh_help_sign = ToUTF8(lzh_help_sign);
+
+			std::string us_help_sign = ToUTF8(lus_help_sign);
+
+			QString qzh_help_sign = QString::fromStdString(zh_help_sign);
+
+			QString qus_help_sign = QString::fromStdString(us_help_sign);
+			{
+
+				auto a = qzh_help_sign.toStdString();
+				std::cout << ", qzh_help_sign text" << Utf8ToGbk(a.c_str()) << std::endl;
+			}
+
 			for (QObject* child : window->findChildren<QObject*>()) {
-				std::cout << "MayaWindow child_name:" << child->objectName().toStdString();
+				//std::cout << "MayaWindow child_name:" << child->objectName().toStdString();
 
 				const QMetaObject* metaObject = child->metaObject();
-				std::cout << ", class name:" << metaObject->className();
+				//std::cout << ", class name:" << metaObject->className();
 
 				if ("wmContentBrowser" == child->objectName()) {
 					auto widget_action = qobject_cast<QWidgetAction*>(child);
@@ -524,18 +553,31 @@ void LimitGivenDir() {
 						auto a = widget_action->text().toStdString();
 						std::cout << ",wmContentBrowser widget_action text" << Utf8ToGbk(a.c_str()) << std::endl;
 						widget_action->setEnabled(false);
+
+						
+
 					}
 				}
 
 				const QMetaObject* parentMetaObject = metaObject->superClass();
 				if (parentMetaObject) {
-					std::cout << ",Parent class name:" << parentMetaObject->className();
+					//std::cout << ",Parent class name:" << parentMetaObject->className();
 					if (QString(parentMetaObject->className()).contains("QWidgetAction")) {
-						std::cout << ",--------------QWidgetAction--------------,";
+						//std::cout << ",--------------QWidgetAction--------------,";
 						auto widget_action = qobject_cast<QWidgetAction*>(child);
 						if (widget_action) {
 							auto a = widget_action->text().toStdString();
 							std::cout << ", widget_action text" << Utf8ToGbk(a.c_str()) << std::endl;
+
+
+							QMetaObject::invokeMethod(qApp, [=]() {
+								if (widget_action->text().contains(qzh_help_sign, Qt::CaseInsensitive) || widget_action->text().contains(qus_help_sign, Qt::CaseInsensitive)) {
+									std::cout << "----------------------widget_action find help--------------------------------" << std::endl;
+									widget_action->setEnabled(false);
+								}
+							});
+
+							
 						}
 					}
 
@@ -550,33 +592,50 @@ void LimitGivenDir() {
 								std::cout << ",action objname:" << action->objectName().toStdString();
 								auto a = action->text().toStdString();
 								std::cout << ",action text:" << Utf8ToGbk(a.c_str());
+								QMetaObject::invokeMethod(qApp, [=]() {
+									if (action->text().contains(QString::fromStdString(zh_help_sign), Qt::CaseInsensitive) || action->text().contains(QString::fromStdString(us_help_sign), Qt::CaseInsensitive)) {
+										action->setEnabled(false);
+										std::cout << "action find help" << std::endl;
+									}
+								});
+
 								QMenu* menu = action->menu();
 								auto mans = menu->actions();
 								for (auto man : mans) {
 									std::cout << ",menu action objname:" << man->objectName().toStdString();
 									auto a = man->text().toStdString();
 									std::cout << ",menu action text:" << Utf8ToGbk(a.c_str()) << std::endl;
-									// ×î½üµÄÎÄ¼ş
-									if ("menuItem564" == man->objectName()) {
-										man->setEnabled(false);
-									}
-									if ("FileMenuRecentFileItems" == man->objectName()) {
-										man->setEnabled(false);
-									}
-									if ("FileMenuRecentBackupItems" == man->objectName()) {
-										man->setEnabled(false);
-									}
-									if ("FileMenuRecentProjectItems" == man->objectName()) {
-										man->setEnabled(false);
-									}
 
-									if ("wmContentBrowser" == man->objectName()) {
-										man->setEnabled(false);
-									}
+									QMetaObject::invokeMethod(qApp, [=]() {
+										if (man->text().contains(QString::fromStdString(zh_help_sign), Qt::CaseInsensitive) || man->text().contains(QString::fromStdString(us_help_sign), Qt::CaseInsensitive)) {
+											man->setEnabled(false);
+											std::cout << "menu action find help" << std::endl;
+										}
 
-									if ("menuItem535" == man->objectName()) {
-										man->setEnabled(false);
-									}
+										// æœ€è¿‘çš„æ–‡ä»¶
+										if ("menuItem564" == man->objectName()) {
+											man->setEnabled(false);
+										}
+										if ("FileMenuRecentFileItems" == man->objectName()) {
+											man->setEnabled(false);
+										}
+										if ("FileMenuRecentBackupItems" == man->objectName()) {
+											man->setEnabled(false);
+										}
+										if ("FileMenuRecentProjectItems" == man->objectName()) {
+											man->setEnabled(false);
+										}
+
+										if ("wmContentBrowser" == man->objectName()) {
+											man->setEnabled(false);
+										}
+
+										if ("menuItem535" == man->objectName()) {
+											man->setEnabled(false);
+										}
+									});
+
+									
 								}
 							}
 						}
@@ -589,7 +648,7 @@ void LimitGivenDir() {
 
 #if 0
 
-				// ÕâÒ»¶Î´úÂë µ¼ÖÂ mayaµ¯´°ÌáÊ¾Í£Ö¹¹¤×÷ to do Òş²Øµô
+				// è¿™ä¸€æ®µä»£ç  å¯¼è‡´ mayaå¼¹çª—æç¤ºåœæ­¢å·¥ä½œ to do éšè—æ‰
 				if ("workspaceSelectorMenu" == child->objectName()) {
 				
 					const QMetaObject* metaObject = child->metaObject();
@@ -651,150 +710,6 @@ void LimitGivenDir() {
 					
 				}
 #endif
-
-				//if ("workspaceSelectorMenu" == child->objectName()) {
-				//
-				//	const QMetaObject* metaObject = child->metaObject();
-				//	std::cout << "-----------------------workspaceSelectorMenu class name:" << metaObject->className() << std::endl;
-				//
-				//	const QMetaObject* parentMetaObject = metaObject->superClass();
-				//	if (parentMetaObject) {
-				//		std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl;;  // qmenu
-				//	}
-				//
-				//
-				//	auto menu = qobject_cast<QMenu*>(child);
-				//
-				//
-				//	for (QObject* menu_child : menu->findChildren<QObject*>()) {
-				//
-				//		std::cout << " menu_child name:" << menu_child->objectName().toStdString() << std::endl;
-				//	}
-				//
-				//
-				//	QMetaObject::invokeMethod(window, [=]() {
-				//		//menu->hide();
-				//		menu->setStyleSheet("background-color:#ff0000;");
-				//
-				//		auto actions = menu->actions();
-				//		for (auto action : actions) {
-				//			std::cout << "action objname:" << action->objectName().toStdString() << std::endl;
-				//			auto a = action->text().toStdString();
-				//			std::cout << "action text:" << Utf8ToGbk(a.c_str()) << std::endl;
-				//		}
-				//	});
-				//
-				//}
-
-
-
-				//if ("qt_menubar_ext_button" == child->objectName()) {
-				//	const QMetaObject* metaObject = child->metaObject();
-				//	std::cout << "----------------------qt_menubar_ext_button class name:" << metaObject->className() << std::endl; // QToolButton
-				//
-				//	const QMetaObject* parentMetaObject = metaObject->superClass();
-				//	if (parentMetaObject) {
-				//		std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl; // qmenu
-				//	}
-				//	
-				//	QToolButton* btn = qobject_cast<QToolButton*>(child);
-				//	if (!btn) {
-				//		std::cout << "qt_menubar_ext_button not QToolButton" << std::endl;
-				//		continue;
-				//	}
-				//	
-				//	QMetaObject::invokeMethod(window, [=]() {
-				//		std::cout << "qt_menubar_ext_button-----------------------------" << btn->text().toStdString() << std::endl;
-				//		btn->setFixedSize(100, 100);
-				//	});
-				//}
-
-				//if ("WorkspaceMenuID_0" == child->objectName()) {
-				//	const QMetaObject* metaObject = child->metaObject();
-				//	std::cout << "----------------------WorkspaceMenuID_0 class name:" << metaObject->className() << std::endl; // QToolButton
-				//
-				//	const QMetaObject* parentMetaObject = metaObject->superClass();
-				//	if (parentMetaObject) {
-				//		std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl;; // qmenu
-				//	}
-				//
-				//	QWidgetAction* action = qobject_cast<QWidgetAction*>(child);
-				//	if (!action) {
-				//		std::cout << "WorkspaceMenuID_0 not QWidgetAction" << std::endl;
-				//		continue;
-				//	}
-				//
-				//	std::cout << "WorkspaceMenuID_0:" << action->text().toStdString() << std::endl;
-				//
-				//
-				//}
-
-
-				//if ("OpenSceneButtonRecentFileItems" == child->objectName()) {
-				//
-				//	const QMetaObject* metaObject = child->metaObject();
-				//	std::cout << "-----------------------OpenSceneButtonRecentFileItems class name:" << metaObject->className() << std::endl;
-				//
-				//	const QMetaObject* parentMetaObject = metaObject->superClass();
-				//	if (parentMetaObject) {
-				//		std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl; // qmenu
-				//	}
-				//
-				//	//for (QObject* menu_child : window->findChildren<QObject*>()) {
-				//	//
-				//	//
-				//	//
-				//	//}
-				//
-				//	auto menu = qobject_cast<QMenu*>(child);
-				//
-				//
-				//	for (QObject* menu_child : menu->findChildren<QObject*>()) {
-				//		
-				//		std::cout << "menu_child name:" << menu_child->objectName().toStdString() << std::endl;
-				//	}
-				//
-				//
-				//	QMetaObject::invokeMethod(window, [=]() {
-				//		//menu->hide();
-				//		menu->setStyleSheet("background-color:#ff0000;");
-				//
-				//		auto actions = menu->actions();
-				//		for (auto action : actions) {
-				//			std::cout << "action" << action->objectName().toStdString() << std::endl;
-				//			std::cout << "action" << action->text().toStdString() << std::endl;
-				//		}
-				//	});
-				//
-				//}
-
-				//if ("menuItem529" == child->objectName()) {
-				//	auto widget = qobject_cast<QWidget*>(child);
-				//	if (!widget) {
-				//		std::cout << "menuItem529 not widget" << std::endl;
-				//		continue;
-				//	}
-				//
-				//	
-				//	QMetaObject::invokeMethod(window, [=]() {
-				//		//menu->hide();
-				//		widget->setStyleSheet("background-color:#ff0000;");
-				//	});
-				//}
-
-				//if ("WorkspaceMenuID_1" == child->objectName()) {
-				//	auto widget = qobject_cast<QWidget*>(child);
-				//
-				//	if (!widget) {
-				//		std::cout << "WorkspaceMenuID_1 not widget" << std::endl;
-				//		continue;
-				//	}
-				//
-				//	QMetaObject::invokeMethod(window, [=]() {
-				//		//menu->hide();
-				//		widget->setStyleSheet("background-color:#ff0000;");
-				//	});
-				//}
 			}
 		}
 		//continue;

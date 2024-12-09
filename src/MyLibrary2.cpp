@@ -96,6 +96,10 @@ std::string Utf8ToGbk(const char* src_str)
 	return strTemp;
 }
 
+static std::string ToUTF8(const std::wstring& src) {
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+	return converter.to_bytes(src);
+}
 
 static QString g_root_1_path = "G:/temp";
 
@@ -106,6 +110,32 @@ static QString g_current_path;
 static std::atomic<bool> g_stop_flag = false;
 
 static QMessageBox* g_message_box = nullptr;
+
+std::thread g_find_widget_thread;
+
+static QWidget* g_workspace_window = nullptr;
+
+static std::wstring g_lzh_help_sign = L"帮助";
+
+static std::wstring g_lus_help_sign = L"help";
+
+static std::wstring g_lzh_about_sign = L"关于";
+
+static std::wstring g_lus_about_sign = L"about";
+
+static std::string g_zh_help_sign = ToUTF8(g_lzh_help_sign);
+
+static std::string g_us_help_sign = ToUTF8(g_lus_help_sign);
+
+static std::string g_zh_about_sign = ToUTF8(g_lzh_about_sign);
+
+static std::string g_us_about_sign = ToUTF8(g_lus_about_sign);
+
+static QString g_qzh_help_sign = QString::fromStdString(g_zh_help_sign);
+
+static QString g_qus_help_sign = QString::fromStdString(g_us_help_sign);
+
+static QString g_qus_about_sign = QString::fromStdString(g_us_about_sign);
 
 bool HandleTargetDir() {
 	QStringList args = qApp->arguments();
@@ -193,47 +223,7 @@ bool CheckEnv() {
 	return true;
 }
 
-HHOOK hHook;
-HINSTANCE g_hInstance = NULL;
-
-// 钩子过程
-LRESULT CALLBACK KeyboardHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
-	std::cout << "KeyboardHookProc-----------" << std::endl;
-	if (nCode == HC_ACTION) {
-		//KBDLLHOOKSTRUCT* pKBDLLHookStruct = (KBDLLHOOKSTRUCT*)lParam;
-		//
-		//// 检查按键是否为 Alt + Home
-		//if (wParam == WM_KEYDOWN &&
-		//	(GetKeyState(VK_MENU) & 0x8000) && // 检查 Alt 键是否按下
-		//	pKBDLLHookStruct->vkCode == VK_HOME) {
-		//	std::cout << "Alt + Home pressed!" << std::endl;
-		//	return 1; // 阻止其他程序处理此组合键
-		//}
-
-		MSG* p = (MSG*)lParam;
-		//判断是否由击键消息
-		if (p->message == WM_KEYDOWN)
-		{
-		
-			std::cout << "KeyboardHookProc-----------" << std::endl;
-		
-		}
-
-
-	}
-	return CallNextHookEx(hHook, nCode, wParam, lParam);
-}
-
-// 安装钩子
-void SetKeyboardHook() {
-	hHook = SetWindowsHookEx(WH_GETMESSAGE, KeyboardHookProc, g_hInstance, 0);
-	if (!hHook) {
-		std::cout << "Failed to install hook!" << std::endl;
-	}
-	else {
-		std::cout << "install hook!" << std::endl;
-	}
-}
+void HideHelpBtn(QWidget* window, QObject* child);
 
 // 考虑容错机制
 // maya 软件版本问题 支持2024
@@ -273,104 +263,153 @@ void SetKeyboardHook() {
 -help                    打印此消息
 */
 
-void HandleQFileDialog(QWidget* window) {
 
+void HandleMayaWindow(QWidget* window) {
+
+	g_workspace_window = window;
+	for (QObject* child : window->findChildren<QObject*>()) {
+		//std::cout << "MayaWindow child_name:" << child->objectName().toStdString();
+		HideHelpBtn(window, child);
+
+
+		const QMetaObject* metaObject = child->metaObject();
+		//std::cout << ", class name:" << metaObject->className();
+		{
+			const QMetaObject* parentMetaObject = metaObject->superClass();
+			if (parentMetaObject) {
+				//std::cout << ",Parent class name:" << parentMetaObject->className();
+			}
+		}
+
+		if ("detailInfoBtn" == child->objectName()) {
+			QAbstractButton* btn = qobject_cast<QAbstractButton*>(child);
+			if (btn) {
+				btn->hide();
+			}
+			continue;
+		}
+
+		if ("wmContentBrowser" == child->objectName()) {
+			auto widget_action = qobject_cast<QWidgetAction*>(child);
+			if (widget_action) {
+				auto a = widget_action->text().toStdString();
+				//std::cout << ",wmContentBrowser widget_action text" << Utf8ToGbk(a.c_str()) << std::endl;
+				widget_action->setEnabled(false);
+			}
+			continue;
+		}
+
+		auto menu_bar = qobject_cast<QMenuBar*>(child);
+		if (menu_bar) {
+			auto actions = menu_bar->actions();
+			for (auto action : actions) {
+				QMenu* menu = action->menu();
+				if (menu) {
+					auto mans = menu->actions();
+					for (auto man : mans) {
+						// 主页
+						if ("menuItem503" == man->objectName()) {
+							man->setEnabled(false);
+						}
+						// 最近的文件
+						if ("menuItem564" == man->objectName()) {
+							man->setEnabled(false);
+						}
+						if ("FileMenuRecentFileItems" == man->objectName()) {
+							man->setEnabled(false);
+						}
+						if ("FileMenuRecentBackupItems" == man->objectName()) {
+							man->setEnabled(false);
+						}
+						if ("FileMenuRecentProjectItems" == man->objectName()) {
+							man->setEnabled(false);
+						}
+						if ("wmContentBrowser" == man->objectName()) {
+							man->setEnabled(false);
+						}
+						if ("menuItem535" == man->objectName()) {
+							man->setEnabled(false);
+						}
+					}
+				}
+				
+			}
+		}
+	}
+}
+
+
+void HandleQFileDialog(QWidget* window) {
 	QTreeView* tree_view = nullptr;
 	QListView* list_view = nullptr;
 	QComboBox* combo_box = nullptr;
-
 	for (QObject* child : window->findChildren<QObject*>()) {
 		//std::cout << "child_name:" << child->objectName().toStdString() /*<< std::endl*/;
 		//路径
-		if ("lookInCombo" == child->objectName().toStdString()) {
+		HideHelpBtn(window, child);
+		QFileSystemModel* file_system_model = nullptr;
+		if (child->objectName().contains("lookInCombo", Qt::CaseInsensitive)) {
 			if (combo_box = qobject_cast<QComboBox*>(child)) {
-				QMetaObject::invokeMethod(window, [=]() {
-					g_current_path = combo_box->currentText();
-					std::string combo_box_text = combo_box->currentText().toStdString();
-					std::cout << "-------------------------------------------------------lookInCombo:" << combo_box_text << std::endl;
-					if (!g_current_path.startsWith(g_root_2_path)) {
+				g_current_path = combo_box->currentText();
+				std::string combo_box_text = combo_box->currentText().toStdString();
+				//std::cout << "-------------------------------------------------------lookInCombo:" << combo_box_text << std::endl;
+				if (!g_current_path.startsWith(g_root_2_path)) {
 
-						std::cout << "-----------not startsWith:" << g_root_2_path.toStdString() << std::endl;
-						combo_box->setEnabled(true); // 如果为false,无法响应QKeyEvent
-						combo_box->setCurrentText(g_root_2_path);
-						QKeyEvent key_event{ QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier };
-						bool res = QCoreApplication::sendEvent(combo_box, &key_event);
-						if (!res) {
-							std::cout << "sendEvent key_event error" << std::endl;
-						}
+					//std::cout << "-----------not startsWith:" << g_root_2_path.toStdString() << std::endl;
+					combo_box->setEnabled(true); // 如果为false,无法响应QKeyEvent
+					combo_box->setCurrentText(g_root_2_path);
+					QKeyEvent key_event{ QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier };
+					bool res = QCoreApplication::sendEvent(combo_box, &key_event);
+					if (!res) {
+						std::cout << "sendEvent key_event error" << std::endl;
 					}
-					else {
-						std::cout << "startsWith" << std::endl;
-					}
-					combo_box->setEnabled(false);
-				});
+				}
+				combo_box->setEnabled(false);
 			}
 		}
-
-		QFileSystemModel* file_system_model = nullptr;
-		if ("qt_filesystem_model" == child->objectName().toStdString()) {
+		else if (child->objectName().contains("qt_filesystem_model", Qt::CaseInsensitive)) {
 			if (file_system_model = qobject_cast<QFileSystemModel*>(child)) {
 				QMetaObject::invokeMethod(window, [=]() {
 					//file_system_model->setRootPath(g_root_1_path); // 这样只会修改文本框里面的值
-					});
+				});
 			}
 		}
-
-		if ("toParentButton" == child->objectName().toStdString()) {
+		else if (child->objectName().contains("toParentButton", Qt::CaseInsensitive)) {
 			if (QToolButton* btn = qobject_cast<QToolButton*>(child)) {
-				QMetaObject::invokeMethod(window, [=]() {
-					if (g_current_path == g_root_1_path || g_current_path == g_root_2_path) {
-						btn->setHidden(true);
-					}
-					else {
-						btn->setHidden(false);
-					}
-					});
-			}
-		}
-
-		if ("backButton" == child->objectName().toStdString()) {
-			if (QToolButton* btn = qobject_cast<QToolButton*>(child)) {
-				QMetaObject::invokeMethod(window, [=]() {
+				if (g_current_path == g_root_1_path || g_current_path == g_root_2_path) {
 					btn->setHidden(true);
-					});
+				}
+				else {
+					btn->setHidden(false);
+				}
 			}
 		}
-
-		if ("forwardButton" == child->objectName().toStdString()) {
+		else if (child->objectName().contains("backButton", Qt::CaseInsensitive)) {
 			if (QToolButton* btn = qobject_cast<QToolButton*>(child)) {
-				QMetaObject::invokeMethod(window, [=]() {
-					btn->setHidden(true);
-					});
+				btn->setHidden(true);
 			}
 		}
-
-		if ("projectArea" == child->objectName().toStdString()) {
+		else if (child->objectName().contains("forwardButton", Qt::CaseInsensitive)) {
+			if (QToolButton* btn = qobject_cast<QToolButton*>(child)) {
+				btn->setHidden(true);
+			}
+		}
+		else if (child->objectName().contains("projectArea", Qt::CaseInsensitive)) {
 			if (QWidget* widget = qobject_cast<QWidget*>(child)) {
-				QMetaObject::invokeMethod(window, [=]() {
-					widget->setStyleSheet("background-color:#00ff00;"); // 左下角项目那块
-					widget->hide();
-					});
+				widget->hide();// 左下角项目那块
 			}
 		}
-
-		if ("ProjectFoldersSplitter" == child->objectName().toStdString()) {
+		else if (child->objectName().contains("ProjectFoldersSplitter", Qt::CaseInsensitive)) {
 			if (QWidget* projwidget = qobject_cast<QWidget*>(child)) {
-				QMetaObject::invokeMethod(window, [=]() {
-					projwidget->setStyleSheet("background-color:#0000ff;"); // 左上角文件夹那块
-					projwidget->hide();
-					});
+				projwidget->hide();// 左上角文件夹那块
 				for (QObject* projchild : projwidget->findChildren<QObject*>()) {
 					//std::cout << "ProjectFoldersSplitter child_name:" << projchild->objectName().toStdString() << std::endl;
 					//projectArea //没反应
 					// qt_scrollarea_viewport
-					if ("qt_scrollarea_viewport" == projchild->objectName().toStdString()) {
+					if (projchild->objectName().contains("qt_scrollarea_viewport", Qt::CaseInsensitive)) {
 						if (QWidget* qt_scrollarea_viewport = qobject_cast<QWidget*>(projchild)) {
 							std::cout << "qt_scrollarea_viewport to QWidget" << std::endl;
-							QMetaObject::invokeMethod(window, [=]() {
-								qt_scrollarea_viewport->setStyleSheet("background-color:#ffff00;"); //有左上角 文件夹列表
-								qt_scrollarea_viewport->hide();
-								});
+							qt_scrollarea_viewport->hide();//有左上角 文件夹列表
 						}
 					}
 				}
@@ -379,17 +418,39 @@ void HandleQFileDialog(QWidget* window) {
 	}
 }
 
-static std::string ToUTF8(const std::wstring& src) {
-	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-	return converter.to_bytes(src);
+void HideHelpBtn(QWidget* window, QObject* child) {
+	if (QWidgetAction* widget_action = qobject_cast<QWidgetAction*>(child)) {
+		if (widget_action->text().contains(g_qzh_help_sign, Qt::CaseInsensitive) || widget_action->text().contains(g_qus_help_sign, Qt::CaseInsensitive)) {
+			widget_action->setEnabled(false);
+		}
+	}
+	else if (QMenuBar* menu_bar = qobject_cast<QMenuBar*>(child)) {
+		auto actions = menu_bar->actions();
+		for (auto action : actions) {
+			//std::cout << ",action objname:" << action->objectName().toStdString();
+			auto a = action->text().toStdString();
+			//std::cout << ",action text:" << Utf8ToGbk(a.c_str());
+			if (action->text().contains(g_qzh_help_sign, Qt::CaseInsensitive) || action->text().contains(g_qus_help_sign, Qt::CaseInsensitive)) {
+				action->setEnabled(false);
+				//std::cout << "action find help" << std::endl;
+			}
+
+			QMenu* menu = action->menu();
+			auto mans = menu->actions();
+			for (auto man : mans) {
+				//std::cout << ",menu action objname:" << man->objectName().toStdString();
+				auto a = man->text().toStdString();
+				//std::cout << ",menu action text:" << Utf8ToGbk(a.c_str()) << std::endl;
+				if (man->objectName().contains("ArnoldAbout", Qt::CaseInsensitive) || man->text().contains(g_qus_help_sign, Qt::CaseInsensitive) || man->text().contains(g_qus_help_sign, Qt::CaseInsensitive)) {
+					man->setEnabled(false);
+					//std::cout << "menu action find help" << std::endl;
+				}
+			}
+		}
+	}
 }
 
-QWidget* workspace_window = nullptr;
-
 void LimitGivenDir() {
-
-	
-
 	if (!HandleTargetDir()) {
 		QMetaObject::invokeMethod(qApp, [=]() {
 			QMessageBox message_box{ QMessageBox::Warning,  "warning", "Unable to find user directory, please contact the administrator." };
@@ -408,316 +469,17 @@ void LimitGivenDir() {
 		});
 		return;
 	}
-
 	while (!g_stop_flag) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(4000));
-		auto window = QApplication::activeWindow();
-		if (NULL == window) {
-			std::cout << "window is null" << std::endl;
-			continue;
-		}
-		std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
-		if ("MayaAppHomeWindow" == window->objectName().toStdString()) {
-			
-
-			QMetaObject::invokeMethod(qApp, [=]() {
-				workspace_window->show();
-				window->hide();
-			});
-			continue;
-
-			//continue;
-			for (QObject* child : window->findChildren<QObject*>()) {
-				std::cout << "MayaAppHomeWindow child_name:" << child->objectName().toStdString();
-				
-				const QMetaObject* metaObject = child->metaObject();
-				std::cout << ", class name:" << metaObject->className();
-
-				const QMetaObject* parentMetaObject = metaObject->superClass();
-				if (parentMetaObject) {
-					std::cout << ",Parent class name:" << parentMetaObject->className();
-					
-					if (QString(parentMetaObject->className()).startsWith("QQuickWidget")) {
-						auto quick_widget = qobject_cast<QQuickWidget*>(child);
-						if (quick_widget) {
-							//quick_widget->hide();
-							//quick_widget->setEnabled(false);
-							std::cout << ",find QQuickWidget" << std::endl;
-
-							//for (QObject* quick_child : quick_widget->findChildren<QObject*>()) {
-							//
-							//	std::cout << "quick_child name:" << quick_child->objectName().toStdString();
-							//
-							//	const QMetaObject* metaObject = quick_child->metaObject();
-							//	std::cout << ", quick_child class name:" << metaObject->className();
-							//
-							//	const QMetaObject* parentMetaObject = metaObject->superClass();
-							//	if (parentMetaObject) {
-							//		std::cout << ",quick_child Parent class name:" << parentMetaObject->className();
-							//	}
-							//}
-
-							QQuickItem* rootItem = quick_widget->rootObject();
-							if (rootItem) {
-								for (QObject* quick_child : rootItem->findChildren<QObject*>()) {
-									
-									std::cout << "quick_child name:" << quick_child->objectName().toStdString();
-
-									const QMetaObject* metaObject = quick_child->metaObject();
-
-									std::cout << ", quick_child class name:" << metaObject->className();
-
-									const QMetaObject* parentMetaObject = metaObject->superClass();
-									if (parentMetaObject) {
-										std::cout << ",quick_child Parent class name:" << parentMetaObject->className();
-									}
-
-								}
-							}
-
-
-						}
-					}
-
-				}
-
-				if (QString(metaObject->className()).startsWith("QWebEnginePage")) {
-					auto page = qobject_cast<QWebEnginePage*>(child);
-					if (page) {
-						//page->setVisible(false);
-					}
-				}
-
-				if (QString(metaObject->className()).startsWith("QVBoxLayout")) {
-					auto vlayout = qobject_cast<QVBoxLayout*>(child);
-					if (vlayout) {
-						auto vlayout_children = vlayout->findChildren<QObject*>();
-						for (auto vlayout_child : vlayout_children) {
-							std::cout << "vlayout_child:" << vlayout_child->objectName().toStdString();
-
-							const QMetaObject* metaObject = vlayout_child->metaObject();
-							std::cout << ",vlayout_child class name:" << metaObject->className();
-
-							const QMetaObject* parentMetaObject = metaObject->superClass();
-							if (parentMetaObject) {
-								std::cout << ",vlayout_child Parent class name:" << parentMetaObject->className();
-
-								
-
-							}
-						}
-					}
-				}
-
-				std::cout << std::endl;
+		std::this_thread::sleep_for(std::chrono::milliseconds(30));
+		
+		QMetaObject::invokeMethod(qApp, [=]() {
+			auto window = QApplication::activeWindow();
+			if (NULL == window) {
+				std::cout << "window is null" << std::endl;
+				return;
 			}
-		} else if ("" == window->objectName().toStdString()) {
-			std::cout << "null title:" << window->windowTitle().toStdString() << std::endl;
-			for (QObject* child : window->findChildren<QObject*>()) {
-			//	std::cout << "null child_name:" << child->objectName().toStdString() << std::endl;
-			}
-		} else if ("AboutArnold" == window->objectName().toStdString()) {
-			QMetaObject::invokeMethod(qApp, [=]() {
-				window->close();
-			});
-		} else if ("MayaWindow" == window->objectName().toStdString()) {
-
-			workspace_window = window;
-
-			std::wstring lzh_help_sign = L"帮助";
-
-			std::wstring lus_help_sign = L"help";
-
-			std::string zh_help_sign = ToUTF8(lzh_help_sign);
-
-			std::string us_help_sign = ToUTF8(lus_help_sign);
-
-			QString qzh_help_sign = QString::fromStdString(zh_help_sign);
-
-			QString qus_help_sign = QString::fromStdString(us_help_sign);
-			{
-
-				auto a = qzh_help_sign.toStdString();
-				std::cout << ", qzh_help_sign text" << Utf8ToGbk(a.c_str()) << std::endl;
-			}
-
-			for (QObject* child : window->findChildren<QObject*>()) {
-				//std::cout << "MayaWindow child_name:" << child->objectName().toStdString();
-
-				const QMetaObject* metaObject = child->metaObject();
-				//std::cout << ", class name:" << metaObject->className();
-
-				if ("wmContentBrowser" == child->objectName()) {
-					auto widget_action = qobject_cast<QWidgetAction*>(child);
-					if (widget_action) {
-						auto a = widget_action->text().toStdString();
-						std::cout << ",wmContentBrowser widget_action text" << Utf8ToGbk(a.c_str()) << std::endl;
-						widget_action->setEnabled(false);
-
-						
-
-					}
-				}
-
-				const QMetaObject* parentMetaObject = metaObject->superClass();
-				if (parentMetaObject) {
-					//std::cout << ",Parent class name:" << parentMetaObject->className();
-					if (QString(parentMetaObject->className()).contains("QWidgetAction")) {
-						//std::cout << ",--------------QWidgetAction--------------,";
-						auto widget_action = qobject_cast<QWidgetAction*>(child);
-						if (widget_action) {
-							auto a = widget_action->text().toStdString();
-							std::cout << ", widget_action text" << Utf8ToGbk(a.c_str()) << std::endl;
-
-
-							QMetaObject::invokeMethod(qApp, [=]() {
-								if (widget_action->text().contains(qzh_help_sign, Qt::CaseInsensitive) || widget_action->text().contains(qus_help_sign, Qt::CaseInsensitive)) {
-									std::cout << "----------------------widget_action find help--------------------------------" << std::endl;
-									widget_action->setEnabled(false);
-								}
-							});
-
-							
-						}
-					}
-
-
-
-					if (QString(parentMetaObject->className()).contains("QMenuBar")) {
-						std::cout << ",--------------QMenuBar--------------,";
-						auto menu_bar = qobject_cast<QMenuBar*>(child);
-						if (menu_bar) {
-							auto actions = menu_bar->actions();
-							for (auto action : actions) {
-								std::cout << ",action objname:" << action->objectName().toStdString();
-								auto a = action->text().toStdString();
-								std::cout << ",action text:" << Utf8ToGbk(a.c_str());
-								QMetaObject::invokeMethod(qApp, [=]() {
-									if (action->text().contains(QString::fromStdString(zh_help_sign), Qt::CaseInsensitive) || action->text().contains(QString::fromStdString(us_help_sign), Qt::CaseInsensitive)) {
-										action->setEnabled(false);
-										std::cout << "action find help" << std::endl;
-									}
-								});
-
-								QMenu* menu = action->menu();
-								auto mans = menu->actions();
-								for (auto man : mans) {
-									std::cout << ",menu action objname:" << man->objectName().toStdString();
-									auto a = man->text().toStdString();
-									std::cout << ",menu action text:" << Utf8ToGbk(a.c_str()) << std::endl;
-
-									QMetaObject::invokeMethod(qApp, [=]() {
-										if (man->text().contains(QString::fromStdString(zh_help_sign), Qt::CaseInsensitive) || man->text().contains(QString::fromStdString(us_help_sign), Qt::CaseInsensitive)) {
-											man->setEnabled(false);
-											std::cout << "menu action find help" << std::endl;
-										}
-
-										// 最近的文件
-										if ("menuItem564" == man->objectName()) {
-											man->setEnabled(false);
-										}
-										if ("FileMenuRecentFileItems" == man->objectName()) {
-											man->setEnabled(false);
-										}
-										if ("FileMenuRecentBackupItems" == man->objectName()) {
-											man->setEnabled(false);
-										}
-										if ("FileMenuRecentProjectItems" == man->objectName()) {
-											man->setEnabled(false);
-										}
-
-										if ("wmContentBrowser" == man->objectName()) {
-											man->setEnabled(false);
-										}
-
-										if ("menuItem535" == man->objectName()) {
-											man->setEnabled(false);
-										}
-									});
-
-									
-								}
-							}
-						}
-					}
-
-
-
-				}
-				//std::cout << std::endl;
-
-#if 0
-
-				// 这一段代码 导致 maya弹窗提示停止工作 to do 隐藏掉
-				if ("workspaceSelectorMenu" == child->objectName()) {
-				
-					const QMetaObject* metaObject = child->metaObject();
-					std::cout << "-----------------------workspaceSelectorMenu class name:" << metaObject->className() << std::endl;
-				
-					const QMetaObject* parentMetaObject = metaObject->superClass();
-					if (parentMetaObject) {
-						std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl;;  // qmenu
-					}
-				
-					if (auto menu = qobject_cast<QMenu*>(child)) {
-					
-						for (QObject* menu_child : menu->findChildren<QObject*>()) {
-
-							std::cout << " menu_child name:" << menu_child->objectName().toStdString() << std::endl;
-						}
-
-
-						QMetaObject::invokeMethod(window, [=]() {
-							//menu->hide();
-							menu->setStyleSheet("background-color:#ff0000;");
-
-							auto actions = menu->actions();
-							for (auto action : actions) {
-								std::cout << "action objname:" << action->objectName().toStdString() << std::endl;
-								auto a = action->text().toStdString();
-								std::cout << "action text:" << Utf8ToGbk(a.c_str()) << std::endl;
-							}
-						});
-					}
-					
-					if (auto combobox = qobject_cast<QComboBox*>(child)) {
-					
-						for (QObject* combobox_child : combobox->findChildren<QObject*>()) {
-
-							std::cout << "combobox_child name:" << combobox_child->objectName().toStdString() << std::endl;
-						}
-					}
-				}
-
-				if ("_layout" == child->objectName()) {
-
-					const QMetaObject* metaObject = child->metaObject();
-					std::cout << "-----------------------_layout class name:" << metaObject->className() << std::endl;
-
-					const QMetaObject* parentMetaObject = metaObject->superClass();
-					if (parentMetaObject) {
-						std::cout << "-----------------------Parent class name:" << parentMetaObject->className() << std::endl;;  // qmenu
-					}
-
-					if (auto layout = qobject_cast<QLayout*>(child)) {
-					
-						for (QObject* combobox_child : layout->findChildren<QObject*>()) {
-
-							std::cout << "layout_child name:" << combobox_child->objectName().toStdString() << std::endl;
-						}
-					}
-
-					
-				}
-#endif
-			}
-		}
-		//continue;
-		if ("QFileDialog" != window->objectName().toStdString()) {
-			continue;
-		}
-		if (!HandleTargetDir()) {
-			QMetaObject::invokeMethod(qApp, [=]() {
+			std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
+			if (!HandleTargetDir()) {
 				if (g_message_box) {
 					return;
 				}
@@ -725,45 +487,51 @@ void LimitGivenDir() {
 				g_message_box->exec();
 				g_message_box = nullptr;
 				window->close();
-			});
-			continue;
-		}
-
-		HandleQFileDialog(window);
+				return;
+			}
+			if (window->objectName().contains("MayaAppHomeWindow", Qt::CaseInsensitive)) {
+				if (g_workspace_window) {
+					g_workspace_window->show();
+					window->hide();
+				}
+			}
+			else if (window->objectName().contains("AboutArnold", Qt::CaseInsensitive)) {
+				window->close();
+			}
+			else if (window->objectName().contains("MayaWindow", Qt::CaseInsensitive)) {
+				HandleMayaWindow(window);
+			} else if (window->objectName().contains("QFileDialog", Qt::CaseInsensitive)) {
+				HandleQFileDialog(window);
+			}
+			else {
+				for (QObject* child : window->findChildren<QObject*>()) {
+					HideHelpBtn(window, child);
+					const QMetaObject* metaObject = child->metaObject();
+					//std::cout << ", class name:" << metaObject->className();
+					const QMetaObject* parentMetaObject = metaObject->superClass();
+					if (parentMetaObject) {
+						//std::cout << ",Parent class name:" << parentMetaObject->className();
+					}
+				}
+				std::cout << "other title:" << window->windowTitle().toStdString() << std::endl;
+			}
+		});
 	}
 }
 
 
-std::thread find_widget_thread;
 
-static int count = 100;
 
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved)
-{
-
-	g_hInstance = (HINSTANCE)hModule;
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved) {
 	switch (ul_reason_for_call)
 	{
 	case DLL_PROCESS_ATTACH:
-		do
-		{
-			--count;
-
-			if (count < 0) {
-				exit(0);
-			}
-
+		do {
 			AllocConsole();
 			freopen("CONOUT$", "w", stdout);
 			std::cout << "This works" << std::endl;
-
-			//SetKeyboardHook();
-
-			
-			find_widget_thread = std::thread(LimitGivenDir);
-
+			g_find_widget_thread = std::thread(LimitGivenDir);
 		} while (false);
-
 	case DLL_THREAD_ATTACH:
 		break;
 	case DLL_THREAD_DETACH:
@@ -771,8 +539,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 	case DLL_PROCESS_DETACH:
 	{
 		g_stop_flag = true;
-		if (find_widget_thread.joinable()) {
-			find_widget_thread.join();
+		if (g_find_widget_thread.joinable()) {
+			g_find_widget_thread.join();
 		}
 	}
 		break;

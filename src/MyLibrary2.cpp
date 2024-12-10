@@ -1,10 +1,13 @@
-#include "MinHook.h"
+#include <Windows.h>
 #include <iostream>
 #include <fileapi.h>
-#include <Windows.h>
 #include <string>
 #include <thread>
 #include <atomic>
+#include <locale>
+#include <codecvt>
+#include <mutex>
+#include <condition_variable>
 #include <qapplication.h>
 #include <qwidget.h>
 #include <qlineedit.h>
@@ -33,52 +36,9 @@
 #include <qaction.h>
 #include <qwidgetaction.h>
 #include <qmenubar.h>
-#include <locale>
-#include <string>
-#include <codecvt>
 #include <QtWebEngineWidgets/QWebEngineView>
 #include <QtQuickWidgets/QQuickWidget>
 #include <QtQuick/qquickitem.h>
-
-
-typedef int (WINAPI* MESSAGEBOXA)(HWND, LPCSTR, LPCSTR, UINT);
-
-//WINBASEAPI DWORD WINAPI GetLogicalDrives(VOID);
-
-typedef DWORD(WINAPI* GetLogicalDrivesPtr)(void);
-
-//DWORD WINAPI GetLongPathNameW(_In_ LPCWSTR lpszShortPath, _Out_writes_to_opt_(cchBuffer, return +1) LPWSTR lpszLongPath, _In_ DWORD cchBuffer);
-
-typedef DWORD(WINAPI* GetLongPathNameWPtr)(LPCWSTR, LPWSTR, DWORD);
-
-//DWORD GetFullPathNameW(LPCWSTR lpFileName, DWORD nBufferLength, LPWSTR lpBuffer, LPWSTR* lpFilePart);
-
-typedef DWORD(WINAPI* GetFullPathNameWPtr)(LPCWSTR, DWORD, LPWSTR, LPWSTR*);
-
-GetFullPathNameWPtr GetFullPathNameW_ptr = NULL;
-
-GetLongPathNameWPtr GetLongPathNameW_ptr = NULL;
-
-GetLogicalDrivesPtr GetLogicalDrives_ptr = NULL;
-
-MESSAGEBOXA fpMessageBoxA = NULL;//指向原MessageBoxA的指针
-
-//用来替代原函数的MessageBox函数
-int WINAPI DetourMessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType)
-{
-	//这里只做简单的修改参数，其实可以做很多事情，甚至不去调用原函数
-	return fpMessageBoxA(hWnd, "Hooked!", lpCaption, uType);
-}
-
-DWORD WINAPI DetourGetLogicalDrives(VOID) {
-	auto drives = GetLogicalDrives_ptr();
-	std::cout << "0 drives = " << drives << std::endl;
-	drives &= ~(1 << 2);
-	std::cout << "1 drives = " << drives << std::endl;
-	// return 0; 能看到C  G 盘
-	return 64; // 目标是G盘
-	//return GetLogicalDrives_ptr();
-}
 
 std::string Utf8ToGbk(const char* src_str)
 {
@@ -101,9 +61,9 @@ static std::string ToUTF8(const std::wstring& src) {
 	return converter.to_bytes(src);
 }
 
-static QString g_root_1_path = "G:/temp";
+static QString g_root_1_path = "G:/";
 
-static QString g_root_2_path = "G:\\temp";
+static QString g_root_2_path = "G:\\";
 
 static QString g_current_path;
 
@@ -111,7 +71,11 @@ static std::atomic<bool> g_stop_flag = false;
 
 static QMessageBox* g_message_box = nullptr;
 
-std::thread g_find_widget_thread;
+static std::condition_variable g_cv;
+
+static std::mutex g_mutex;
+
+static std::thread g_find_widget_thread;
 
 static QWidget* g_workspace_window = nullptr;
 
@@ -227,7 +191,7 @@ void HideHelpBtn(QWidget* window, QObject* child);
 
 // 考虑容错机制
 // maya 软件版本问题 支持2024
-// 考虑 g:/temp  g:/temp1234 这样的  测试一下 渲染端的权限控制
+// 考虑 g:/temp  g:/temp1234 这样的  测试一下 渲染端的权限控制    // 
 // 马康泰映射目录 传参那里
 // -noAutoloadPlugins 不加载任何插件
 
@@ -270,8 +234,6 @@ void HandleMayaWindow(QWidget* window) {
 	for (QObject* child : window->findChildren<QObject*>()) {
 		//std::cout << "MayaWindow child_name:" << child->objectName().toStdString();
 		HideHelpBtn(window, child);
-
-
 		const QMetaObject* metaObject = child->metaObject();
 		//std::cout << ", class name:" << metaObject->className();
 		{
@@ -369,9 +331,7 @@ void HandleQFileDialog(QWidget* window) {
 		}
 		else if (child->objectName().contains("qt_filesystem_model", Qt::CaseInsensitive)) {
 			if (file_system_model = qobject_cast<QFileSystemModel*>(child)) {
-				QMetaObject::invokeMethod(window, [=]() {
-					//file_system_model->setRootPath(g_root_1_path); // 这样只会修改文本框里面的值
-				});
+				//file_system_model->setRootPath(g_root_1_path); // 这样只会修改文本框里面的值
 			}
 		}
 		else if (child->objectName().contains("toParentButton", Qt::CaseInsensitive)) {
@@ -418,6 +378,23 @@ void HandleQFileDialog(QWidget* window) {
 	}
 }
 
+void HandleMayaHomeWindow(QWidget* window) {
+	QKeyEvent key_event{ QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier };
+	bool res = QCoreApplication::sendEvent(window, &key_event);
+	for (QObject* child : window->findChildren<QObject*>()) {
+		const QMetaObject* metaObject = child->metaObject();
+		const QMetaObject* parentMetaObject = metaObject->superClass();
+		if (parentMetaObject) {
+			if (QString(parentMetaObject->className()).startsWith("QQuickWidget")) {
+				auto quick_widget = qobject_cast<QQuickWidget*>(child);
+				if (quick_widget) {
+					quick_widget->setEnabled(false);
+				}
+			}
+		}
+	}
+}
+
 void HideHelpBtn(QWidget* window, QObject* child) {
 	if (QWidgetAction* widget_action = qobject_cast<QWidgetAction*>(child)) {
 		if (widget_action->text().contains(g_qzh_help_sign, Qt::CaseInsensitive) || widget_action->text().contains(g_qus_help_sign, Qt::CaseInsensitive)) {
@@ -451,13 +428,15 @@ void HideHelpBtn(QWidget* window, QObject* child) {
 }
 
 void LimitGivenDir() {
+#if 0
 	if (!HandleTargetDir()) {
 		QMetaObject::invokeMethod(qApp, [=]() {
 			QMessageBox message_box{ QMessageBox::Warning,  "warning", "Unable to find user directory, please contact the administrator." };
 			message_box.exec();
 		});
 	}
-
+#endif
+#if 0
 	if (!CheckEnv()) {
 		QMetaObject::invokeMethod(qApp, [=]() {
 			QMessageBox message_box{ QMessageBox::Warning,  "warning", "Environment variables not set correctly or set error, please contact the administrator. The program is about to exit." };
@@ -469,8 +448,15 @@ void LimitGivenDir() {
 		});
 		return;
 	}
+#endif
 	while (!g_stop_flag) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(30));
+		{
+			std::unique_lock<std::mutex> lck{ g_mutex }; 
+			g_cv.wait_for(lck, std::chrono::milliseconds(30));
+			if (g_stop_flag) {
+				break;
+			}
+		}
 		
 		QMetaObject::invokeMethod(qApp, [=]() {
 			auto window = QApplication::activeWindow();
@@ -479,21 +465,18 @@ void LimitGivenDir() {
 				return;
 			}
 			std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
-			if (!HandleTargetDir()) {
-				if (g_message_box) {
-					return;
-				}
-				g_message_box = new QMessageBox{ QMessageBox::Warning,  "warning", "Unable to find user directory, please contact the administrator." };
-				g_message_box->exec();
-				g_message_box = nullptr;
-				window->close();
-				return;
-			}
+			//if (!HandleTargetDir()) {
+			//	if (g_message_box) {
+			//		return;
+			//	}
+			//	g_message_box = new QMessageBox{ QMessageBox::Warning,  "warning", "Unable to find user directory, please contact the administrator." };
+			//	g_message_box->exec();
+			//	g_message_box = nullptr;
+			//	window->close();
+			//	return;
+			//}
 			if (window->objectName().contains("MayaAppHomeWindow", Qt::CaseInsensitive)) {
-				if (g_workspace_window) {
-					g_workspace_window->show();
-					window->hide();
-				}
+				HandleMayaHomeWindow(window);
 			}
 			else if (window->objectName().contains("AboutArnold", Qt::CaseInsensitive)) {
 				window->close();
@@ -539,6 +522,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 	case DLL_PROCESS_DETACH:
 	{
 		g_stop_flag = true;
+		g_cv.notify_all();
 		if (g_find_widget_thread.joinable()) {
 			g_find_widget_thread.join();
 		}

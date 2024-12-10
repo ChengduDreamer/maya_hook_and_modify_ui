@@ -105,6 +105,8 @@ bool HandleTargetDir() {
 	QStringList args = qApp->arguments();
 	std::cout << "args size:" << args.size() << std::endl;
 	if (args.size() < 3) {
+		QMessageBox message_box{ QMessageBox::Warning,  "warning", "No specified working directory, please contact the administrator." };
+		message_box.exec();
 		qApp->exit();
 		return false;
 	}
@@ -234,6 +236,7 @@ void HandleMayaWindow(QWidget* window) {
 	for (QObject* child : window->findChildren<QObject*>()) {
 		//std::cout << "MayaWindow child_name:" << child->objectName().toStdString();
 		HideHelpBtn(window, child);
+#if 0
 		const QMetaObject* metaObject = child->metaObject();
 		//std::cout << ", class name:" << metaObject->className();
 		{
@@ -242,6 +245,7 @@ void HandleMayaWindow(QWidget* window) {
 				//std::cout << ",Parent class name:" << parentMetaObject->className();
 			}
 		}
+#endif
 
 		if ("detailInfoBtn" == child->objectName()) {
 			QAbstractButton* btn = qobject_cast<QAbstractButton*>(child);
@@ -379,8 +383,6 @@ void HandleQFileDialog(QWidget* window) {
 }
 
 void HandleMayaHomeWindow(QWidget* window) {
-	QKeyEvent key_event{ QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier };
-	bool res = QCoreApplication::sendEvent(window, &key_event);
 	for (QObject* child : window->findChildren<QObject*>()) {
 		const QMetaObject* metaObject = child->metaObject();
 		const QMetaObject* parentMetaObject = metaObject->superClass();
@@ -393,6 +395,8 @@ void HandleMayaHomeWindow(QWidget* window) {
 			}
 		}
 	}
+	QKeyEvent key_event{ QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier };
+	bool res = QCoreApplication::sendEvent(window, &key_event);
 }
 
 void HideHelpBtn(QWidget* window, QObject* child) {
@@ -428,7 +432,7 @@ void HideHelpBtn(QWidget* window, QObject* child) {
 }
 
 void LimitGivenDir() {
-#if 0
+#if 1 // 判断有没有给定工作目录，判断工作目录是否存在
 	if (!HandleTargetDir()) {
 		QMetaObject::invokeMethod(qApp, [=]() {
 			QMessageBox message_box{ QMessageBox::Warning,  "warning", "Unable to find user directory, please contact the administrator." };
@@ -436,7 +440,7 @@ void LimitGivenDir() {
 		});
 	}
 #endif
-#if 0
+#if 1 // 检查环境变量
 	if (!CheckEnv()) {
 		QMetaObject::invokeMethod(qApp, [=]() {
 			QMessageBox message_box{ QMessageBox::Warning,  "warning", "Environment variables not set correctly or set error, please contact the administrator. The program is about to exit." };
@@ -465,16 +469,16 @@ void LimitGivenDir() {
 				return;
 			}
 			std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
-			//if (!HandleTargetDir()) {
-			//	if (g_message_box) {
-			//		return;
-			//	}
-			//	g_message_box = new QMessageBox{ QMessageBox::Warning,  "warning", "Unable to find user directory, please contact the administrator." };
-			//	g_message_box->exec();
-			//	g_message_box = nullptr;
-			//	window->close();
-			//	return;
-			//}
+			if (!HandleTargetDir()) {
+				if (g_message_box) {
+					return;
+				}
+				g_message_box = new QMessageBox{ QMessageBox::Warning,  "warning", "Unable to find user directory, please contact the administrator." };
+				g_message_box->exec();
+				g_message_box = nullptr;
+				window->close();
+				return;
+			}
 			if (window->objectName().contains("MayaAppHomeWindow", Qt::CaseInsensitive)) {
 				HandleMayaHomeWindow(window);
 			}
@@ -501,9 +505,6 @@ void LimitGivenDir() {
 		});
 	}
 }
-
-
-
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReserved) {
 	switch (ul_reason_for_call)

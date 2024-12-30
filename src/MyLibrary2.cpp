@@ -61,9 +61,9 @@ static std::string ToUTF8(const std::wstring& src) {
 	return converter.to_bytes(src);
 }
 
-static QString g_root_1_path = "G:/";
+static QString g_root_1_path = "Z:/";
 
-static QString g_root_2_path = "G:\\";
+static QString g_root_2_path = "Z:\\";
 
 static QString g_current_path;
 
@@ -103,7 +103,7 @@ static QString g_qus_about_sign = QString::fromStdString(g_us_about_sign);
 
 bool HandleTargetDir() {
 	QStringList args = qApp->arguments();
-	std::cout << "args size:" << args.size() << std::endl;
+	//std::cout << "args size:" << args.size() << std::endl;
 	if (args.size() < 3) {
 		QMessageBox message_box{ QMessageBox::Warning,  "warning", "No specified working directory, please contact the administrator." };
 		message_box.exec();
@@ -113,7 +113,7 @@ bool HandleTargetDir() {
 	int args_index = 0;
 	QString target_dir_path;
 	for (auto arg : args) {
-		std::cout << "arg:" << arg.toStdString() << std::endl;
+		//std::cout << "arg:" << arg.toStdString() << std::endl;
 		if ("-proj" == arg) {
 			if (args_index + 1 < args.size()) {
 				target_dir_path = args[args_index + 1];
@@ -124,11 +124,11 @@ bool HandleTargetDir() {
 	if (target_dir_path.isEmpty()) {
 		return false;
 	}
-	std::cout << "target_dir_path:" << target_dir_path.toStdString() << std::endl;
+	//std::cout << "target_dir_path:" << target_dir_path.toStdString() << std::endl;
 
 	QDir target_dir{ target_dir_path };
 	if (!target_dir.exists()) {
-		std::cout << "target_dir is not exists." << std::endl;
+		//std::cout << "target_dir is not exists." << std::endl;
 		target_dir.mkpath(target_dir_path);
 	}
 	if (!target_dir.exists()) {
@@ -147,19 +147,18 @@ bool CheckEnv() {
 		char value[256] = { 0, };
 		DWORD result = GetEnvironmentVariableA(varName, value, bufferSize);
 		if (result > 0 && result < bufferSize) {// 成功获取环境变量
-			std::cout << varName << " = " << value << std::endl;
+			//std::cout << varName << " = " << value << std::endl;
 			std::string real_value = value;
 			if (real_value != expect_value) {
 				return false;
 			}
 		}
 		else if (result == 0) { // 环境变量不存在
-			std::cout << varName << " is not set." << std::endl;
+			//std::cout << varName << " is not set." << std::endl;
 			return false;
 		}
 		else { // 缓冲区不够大
-			return false;
-			std::cout << "Buffer size is too small. Required size: " << result << std::endl;
+			//std::cout << "Buffer size is too small. Required size: " << result << std::endl;
 			return false;
 		}
 	}
@@ -171,18 +170,18 @@ bool CheckEnv() {
 		char value[256] = { 0, };
 		DWORD result = GetEnvironmentVariableA(varName, value, bufferSize);
 		if (result > 0 && result < bufferSize) {// 成功获取环境变量
-			std::cout << varName << " = " << value << std::endl;
+			//std::cout << varName << " = " << value << std::endl;
 			std::string real_value = value;
 			if (real_value != expect_value) {
 				return false;
 			}
 		}
 		else if (result == 0) { // 环境变量不存在
-			std::cout << varName << " is not set." << std::endl;
+			//std::cout << varName << " is not set." << std::endl;
 			return false;
 		}
 		else { // 缓冲区不够大
-			std::cout << "Buffer size is too small. Required size: " << result << std::endl;
+			//std::cout << "Buffer size is too small. Required size: " << result << std::endl;
 			return false;
 		}
 	}
@@ -327,7 +326,7 @@ void HandleQFileDialog(QWidget* window) {
 					QKeyEvent key_event{ QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier };
 					bool res = QCoreApplication::sendEvent(combo_box, &key_event);
 					if (!res) {
-						std::cout << "sendEvent key_event error" << std::endl;
+						//std::cout << "sendEvent key_event error" << std::endl;
 					}
 				}
 				combo_box->setEnabled(false);
@@ -372,7 +371,7 @@ void HandleQFileDialog(QWidget* window) {
 					// qt_scrollarea_viewport
 					if (projchild->objectName().contains("qt_scrollarea_viewport", Qt::CaseInsensitive)) {
 						if (QWidget* qt_scrollarea_viewport = qobject_cast<QWidget*>(projchild)) {
-							std::cout << "qt_scrollarea_viewport to QWidget" << std::endl;
+							//std::cout << "qt_scrollarea_viewport to QWidget" << std::endl;
 							qt_scrollarea_viewport->hide();//有左上角 文件夹列表
 						}
 					}
@@ -397,6 +396,18 @@ void HandleMayaHomeWindow(QWidget* window) {
 	}
 	QKeyEvent key_event{ QEvent::KeyPress, Qt::Key_Escape, Qt::NoModifier };
 	bool res = QCoreApplication::sendEvent(window, &key_event);
+
+#if 0
+	for (QObject* child : window->findChildren<QObject*>()) {
+		//HideHelpBtn(window, child);
+		const QMetaObject* metaObject = child->metaObject();
+		std::cout << ", class name:" << metaObject->className() << ", objname" << child->objectName().toStdString();
+		const QMetaObject* parentMetaObject = metaObject->superClass();
+		if (parentMetaObject) {
+			std::cout << ",Parent class name:" << parentMetaObject->className() << std::endl;
+		}
+	}
+#endif
 }
 
 void HideHelpBtn(QWidget* window, QObject* child) {
@@ -447,7 +458,7 @@ void LimitGivenDir() {
 			message_box.exec();
 			QTimer::singleShot(3000, []() {
 				qApp->exit();
-				exit(-1);
+				exit(0);
 			});
 		});
 		return;
@@ -465,10 +476,10 @@ void LimitGivenDir() {
 		QMetaObject::invokeMethod(qApp, [=]() {
 			auto window = QApplication::activeWindow();
 			if (NULL == window) {
-				std::cout << "window is null" << std::endl;
+				//std::cout << "window is null" << std::endl;
 				return;
 			}
-			std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
+			//std::cout << "window = " << (void*)window << ":" << window->objectName().toStdString() << std::endl;
 			if (!HandleTargetDir()) {
 				if (g_message_box) {
 					return;
@@ -500,7 +511,7 @@ void LimitGivenDir() {
 						//std::cout << ",Parent class name:" << parentMetaObject->className();
 					}
 				}
-				std::cout << "other title:" << window->windowTitle().toStdString() << std::endl;
+				//std::cout << "other title:" << window->windowTitle().toStdString() << std::endl;
 			}
 		});
 	}
@@ -511,9 +522,9 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD  ul_reason_for_call, LPVOID lpReser
 	{
 	case DLL_PROCESS_ATTACH:
 		do {
-			AllocConsole();
-			freopen("CONOUT$", "w", stdout);
-			std::cout << "This works" << std::endl;
+			//AllocConsole();
+			//freopen("CONOUT$", "w", stdout);
+			//std::cout << "This works" << std::endl;
 			g_find_widget_thread = std::thread(LimitGivenDir);
 		} while (false);
 	case DLL_THREAD_ATTACH:
